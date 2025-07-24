@@ -23,10 +23,49 @@ evalite("Deep Search Eval", {
 					},
 				],
 			},
+			{
+				input: [
+					{
+						id: "3",
+						role: "user",
+						content: "How do I install React?",
+					},
+				],
+			},
+			{
+				input: [
+					{
+						id: "4",
+						role: "user",
+						content: "What are the best practices for API design?",
+					},
+				],
+			},
+			{
+				input: [
+					{
+						id: "5",
+						role: "user",
+						content: "Explain what is machine learning",
+					},
+				],
+			},
 		];
 	},
 	task: async (input) => {
 		return askDeepSearch(input);
 	},
-	scorers: [],
+	scorers: [
+		{
+			name: "Contains Links",
+			description: "Checks if the output contains any markdown links.",
+			scorer: ({ output }) => {
+				// Check for markdown link syntax: [text](url)
+				const markdownLinkRegex = /\[.*?\]\(.*?\)/;
+				const containsLinks = markdownLinkRegex.test(output);
+
+				return containsLinks ? 1 : 0;
+			},
+		},
+	],
 });
