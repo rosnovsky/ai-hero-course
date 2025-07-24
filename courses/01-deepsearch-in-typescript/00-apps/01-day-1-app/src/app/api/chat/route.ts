@@ -6,7 +6,8 @@ import { env } from "~/env";
 import { generateChatTitle } from "~/lib/helpers";
 import { auth } from "~/server/auth/index.ts";
 import { getChat, upsertChat } from "~/server/db/chats";
-import { checkRateLimit, recordRequest } from "~/server/rate-limiter";
+import type { RateLimitConfig } from "~/server/global-rate-limiter";
+import { checkRateLimit, recordRateLimit } from "~/server/global-rate-limiter";
 
 const langfuse = new Langfuse({
 	environment: env.NODE_ENV,
@@ -29,25 +30,47 @@ export async function POST(request: Request) {
 		userId: session.user.id,
 	});
 
-	const rateLimitSpan = trace.span({
-		name: "check-rate-limit",
-		input: { userId },
-	});
-	const canMakeRequest = await checkRateLimit(userId);
-	rateLimitSpan.end({
-		output: { canMakeRequest },
-	});
-	console.debug({ canMakeRequest });
+	// Global rate limit configuration for testing
+	const config: RateLimitConfig = {
+		maxRequests: 1,
+		maxRetries: 3,
+		windowMs: 60_000, // 5 seconds
+		keyPrefix: "global",
+	};
 
-	if (!canMakeRequest) {
-		return new Response("Too Many Requests", { status: 429 });
+	const rateLimitSpan = trace.span({
+		name: "check-global-rate-limit",
+		input: { config },
+	});
+
+	// Check the global rate limit
+	const rateLimitCheck = await checkRateLimit(config);
+
+	if (!rateLimitCheck.allowed) {
+		console.log("Global rate limit exceeded, waiting...");
+		const isAllowed = await rateLimitCheck.retry();
+
+		// If the rate limit is still exceeded after retries, return a 429
+		if (!isAllowed) {
+			rateLimitSpan.end({
+				output: { allowed: false, retriesExhausted: true },
+			});
+			return new Response("Rate limit exceeded", {
+				status: 429,
+			});
+		}
 	}
 
-	const recordRequestSpan = trace.span({
-		name: "record-request",
-		input: { userId },
+	rateLimitSpan.end({
+		output: { allowed: true, remaining: rateLimitCheck.remaining },
 	});
-	await recordRequest(userId);
+
+	// Record the request after successful rate limit check
+	const recordRequestSpan = trace.span({
+		name: "record-global-rate-limit",
+		input: { config },
+	});
+	await recordRateLimit(config);
 	recordRequestSpan.end({
 		output: { success: true },
 	});
