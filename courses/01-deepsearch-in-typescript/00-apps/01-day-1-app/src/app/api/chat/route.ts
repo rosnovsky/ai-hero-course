@@ -1,12 +1,22 @@
 import type { Message } from "ai";
-import { appendResponseMessages, createDataStreamResponse, streamText } from "ai";
+import {
+	appendResponseMessages,
+	createDataStreamResponse,
+	streamText,
+} from "ai";
+import { Langfuse } from "langfuse";
 import { z } from "zod";
+import { env } from "~/env";
 import { generateChatTitle } from "~/lib/helpers";
 import { model } from "~/models";
 import { searchSerper } from "~/serper";
 import { auth } from "~/server/auth/index.ts";
 import { getChat, upsertChat } from "~/server/db/chats";
 import { checkRateLimit, recordRequest } from "~/server/rate-limiter";
+
+const langfuse = new Langfuse({
+	environment: env.NODE_ENV,
+});
 
 export const maxDuration = 60;
 
@@ -20,7 +30,7 @@ export async function POST(request: Request) {
 	const userId = session.user.id;
 
 	const canMakeRequest = await checkRateLimit(userId);
-	console.debug({ canMakeRequest})
+	console.debug({ canMakeRequest });
 
 	if (!canMakeRequest) {
 		return new Response("Too Many Requests", { status: 429 });
@@ -59,9 +69,15 @@ export async function POST(request: Request) {
 			userId,
 			chatId: currentChatId,
 			title,
-			messages: messages.filter(msg => msg.role === "user"), // Only save user messages initially
+			messages: messages.filter((msg) => msg.role === "user"), // Only save user messages initially
 		});
 	}
+
+	const trace = langfuse.trace({
+		sessionId: currentChatId,
+		name: "chat",
+		userId: session.user.id,
+	});
 
 	return createDataStreamResponse({
 		execute: async (dataStream) => {
@@ -76,7 +92,13 @@ export async function POST(request: Request) {
 				model,
 				messages,
 				maxSteps: 10,
-				experimental_telemetry: { isEnabled: true },
+				experimental_telemetry: {
+					isEnabled: true,
+					functionId: `agent`,
+					metadata: {
+						langfuseTraceId: trace.id,
+					},
+				},
 				system: `You are a helpful assistant. Always try to answer user questions by searching the web using the 'searchWeb' tool. When providing information, always cite your sources with inline links using the format [1](link), [2](link), etc., corresponding to the search results.`,
 				tools: {
 					searchWeb: {
@@ -116,6 +138,8 @@ export async function POST(request: Request) {
 							title,
 							messages: updatedMessages,
 						});
+
+						await langfuse.flushAsync();
 					} catch (error) {
 						console.error("Error saving chat:", error);
 						// Don't throw here to avoid breaking the stream response
