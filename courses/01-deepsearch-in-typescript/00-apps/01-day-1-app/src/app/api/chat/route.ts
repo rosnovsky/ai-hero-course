@@ -114,6 +114,10 @@ export async function POST(request: Request) {
 
 IMPORTANT: You MUST use scrapePages after searchWeb to get complete information. Search snippets are often incomplete.
 
+Current date and time: ${new Date().toISOString()}
+
+When users ask for "up to date", "latest", "recent", or "current" information, make sure to include the current date in your search queries to find the most recent information available.
+
 Workflow:
 1. Start with searchWeb to find relevant sources
 2. ALWAYS follow up with scrapePages on the most relevant URLs from search results
@@ -137,6 +141,7 @@ When providing information, always cite your sources with inline links using the
 								title: result.title,
 								link: result.link,
 								snippet: result.snippet,
+								date: result.date,
 							}));
 						},
 					},
