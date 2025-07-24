@@ -1,32 +1,18 @@
 import type { Message } from "ai";
-import {
-    appendResponseMessages,
-    createDataStreamResponse,
-    streamText,
-} from "ai";
+import { appendResponseMessages, createDataStreamResponse } from "ai";
 import { Langfuse } from "langfuse";
-import { z } from "zod";
+import { streamFromDeepSearch } from "~/deep-search";
 import { env } from "~/env";
 import { generateChatTitle } from "~/lib/helpers";
-import { model } from "~/models";
-import { searchSerper } from "~/serper";
 import { auth } from "~/server/auth/index.ts";
 import { getChat, upsertChat } from "~/server/db/chats";
 import { checkRateLimit, recordRequest } from "~/server/rate-limiter";
-import { cacheWithRedis } from "~/server/redis/redis";
-import { bulkCrawlWebsites } from "~/server/web-scraper";
 
 const langfuse = new Langfuse({
 	environment: env.NODE_ENV,
 });
 
 export const maxDuration = 60;
-
-// Cache the bulk crawl function
-const cachedBulkCrawlWebsites = cacheWithRedis(
-	"scrapePages",
-	bulkCrawlWebsites,
-);
 
 export async function POST(request: Request) {
 	const session = await auth();
@@ -85,7 +71,11 @@ export async function POST(request: Request) {
 		});
 		const existingChat = await getChat(currentChatId, userId);
 		getChatSpan.end({
-			output: { existingChat: existingChat ? { id: existingChat.id, title: existingChat.title } : null },
+			output: {
+				existingChat: existingChat
+					? { id: existingChat.id, title: existingChat.title }
+					: null,
+			},
 		});
 		if (!existingChat) {
 			return new Response("Chat not found or unauthorized", { status: 404 });
@@ -134,67 +124,8 @@ export async function POST(request: Request) {
 				});
 			}
 
-			const result = streamText({
-				model,
+			const result = streamFromDeepSearch({
 				messages,
-				maxSteps: 10,
-				experimental_telemetry: {
-					isEnabled: true,
-					functionId: `agent`,
-					metadata: {
-						langfuseTraceId: trace.id,
-					},
-				},
-				system: `You are a helpful assistant with access to two powerful tools:
-
-1. 'searchWeb' - Use this first to find relevant web pages and get snippets
-2. 'scrapePages' - Use this to get the full content from web pages
-
-IMPORTANT: You MUST use scrapePages after searchWeb to get complete information. Search snippets are often incomplete.
-
-Current date and time: ${new Date().toISOString()}
-
-When users ask for "up to date", "latest", "recent", or "current" information, make sure to include the current date in your search queries to find the most recent information available.
-
-Workflow:
-1. Start with searchWeb to find relevant sources
-2. ALWAYS follow up with scrapePages on the most relevant URLs from search results
-3. Only provide your final answer after you have scraped the actual content
-
-Use scrapePages for: full articles, detailed explanations, code examples, complete documentation, or any time you need more than just snippets.
-
-When providing information, always cite your sources with inline links using the format [1](link), [2](link), etc.`,
-				tools: {
-					searchWeb: {
-						parameters: z.object({
-							query: z.string().describe("The query to search the web for"),
-						}),
-						execute: async ({ query }: { query: string }, { abortSignal }) => {
-							const results = await searchSerper(
-								{ q: query, num: 10 },
-								abortSignal,
-							);
-
-							return results.organic.map((result) => ({
-								title: result.title,
-								link: result.link,
-								snippet: result.snippet,
-								date: result.date,
-							}));
-						},
-					},
-					scrapePages: {
-						parameters: z.object({
-							urls: z.array(z.string()).describe("URLs to scrape"),
-						}),
-						execute: async ({ urls }: { urls: string[] }) => {
-							console.log("🕷️ scrapePages tool called with URLs:", urls);
-							const result = await cachedBulkCrawlWebsites({ urls });
-							console.log("🕷️ scrapePages result:", result);
-							return result;
-						},
-					},
-				},
 				onFinish: async ({ response }) => {
 					try {
 						const responseMessages = response.messages;
@@ -232,6 +163,13 @@ When providing information, always cite your sources with inline links using the
 						console.error("Error saving chat:", error);
 						// Don't throw here to avoid breaking the stream response
 					}
+				},
+				telemetry: {
+					isEnabled: true,
+					functionId: `agent`,
+					metadata: {
+						langfuseTraceId: trace.id,
+					},
 				},
 			});
 
