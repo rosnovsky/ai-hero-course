@@ -76,6 +76,7 @@ export async function POST(request: Request) {
 				model,
 				messages,
 				maxSteps: 10,
+				experimental_telemetry: { isEnabled: true },
 				system: `You are a helpful assistant. Always try to answer user questions by searching the web using the 'searchWeb' tool. When providing information, always cite your sources with inline links using the format [1](link), [2](link), etc., corresponding to the search results.`,
 				tools: {
 					searchWeb: {
