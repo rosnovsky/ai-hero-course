@@ -1,20 +1,13 @@
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { auth } from "~/server/auth/index.ts";
+import { getChats } from "~/server/db/chats.ts";
 import { AuthButton } from "../components/auth-button.tsx";
-
-const chats = [
-	{
-		id: "1",
-		title: "My First Chat",
-	},
-];
-
-const activeChatId = "1";
 
 export default async function HomePage() {
 	const session = await auth();
 	const isAuthenticated = !!session?.user;
+	const chats = await getChats(session!.user.id);
 
 	return (
 		<div className="flex h-screen bg-gray-950">
@@ -40,11 +33,7 @@ export default async function HomePage() {
 							<div key={chat.id} className="flex items-center gap-2">
 								<Link
 									href={`/chat/${chat.id}`}
-									className={`flex-1 rounded-lg p-3 text-left text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-										chat.id === activeChatId
-											? "bg-gray-700"
-											: "hover:bg-gray-750 bg-gray-800"
-									}`}
+									className={`flex-1 rounded-lg p-3 text-left text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 hover:bg-gray-750 bg-gray-800`}
 								>
 									{chat.title}
 								</Link>
@@ -69,12 +58,13 @@ export default async function HomePage() {
 			{/* Main content area */}
 			<div className="flex flex-1 flex-col items-center justify-center bg-gray-950 text-gray-400">
 				<div className="text-center">
-					<h1 className="text-2xl font-semibold text-gray-200 mb-4">Welcome to AI Chat</h1>
+					<h1 className="text-2xl font-semibold text-gray-200 mb-4">
+						Welcome to AI Chat
+					</h1>
 					<p className="text-lg mb-6">
 						{isAuthenticated
 							? "Select a chat from the sidebar or start a new conversation"
-							: "Sign in to start chatting with AI"
-						}
+							: "Sign in to start chatting with AI"}
 					</p>
 					{isAuthenticated && (
 						<Link

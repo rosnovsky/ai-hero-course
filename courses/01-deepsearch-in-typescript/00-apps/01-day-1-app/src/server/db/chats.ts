@@ -46,13 +46,33 @@ export const upsertChat = async (opts: {
 		// Insert new messages
 		if (newMessages.length > 0) {
 			await tx.insert(messages).values(
-				newMessages.map((msg, index) => ({
-					id: crypto.randomUUID(), // Use crypto.randomUUID() for message IDs
-					chatId,
-					role: msg.role,
-					parts: msg.content, // `msg.content` can be `string | Part[]`, store as JSONB object
-					order: index,
-				})),
+				newMessages.map((msg, index) => {
+					// Normalize messages to always use parts format
+					let parts: Message["parts"];
+					if (msg.parts && Array.isArray(msg.parts)) {
+						// Message already has parts (assistant messages with tool calls, etc.)
+						parts = msg.parts;
+					} else if (msg.content) {
+						// Convert string content to parts format (user messages, simple assistant messages)
+						if (typeof msg.content === "string") {
+							parts = [{ type: "text", text: msg.content }];
+						} else {
+							// content is already an array of parts
+							parts = msg.content;
+						}
+					} else {
+						// Fallback for empty messages
+						parts = [];
+					}
+
+					return {
+						id: crypto.randomUUID(), // Use crypto.randomUUID() for message IDs
+						chatId,
+						role: msg.role,
+						parts, // Store normalized parts array
+						order: index,
+					};
+				}),
 			);
 		}
 	});
@@ -72,20 +92,11 @@ export const getChat = async (chatId: string, userId: string) => {
 		return null;
 	}
 
-	// Map database messages back to the 'ai' Message type
-	const formattedMessages: Message[] = chatWithMessages.messages.map((msg) => ({
-		id: msg.id,
-		role: msg.role as Message["role"],
-		// `msg.parts` can be `string | object[]`. Message content expects a string.
-		// If it's an object array, stringify it. Otherwise, use it directly.
-		content: typeof msg.parts === "string" ? msg.parts : JSON.stringify(msg.parts),
-	}));
-
-	return {
-		...chatWithMessages,
-		messages: formattedMessages,
-	};
+	// Return the chat with raw database messages (no formatting)
+	return chatWithMessages;
 };
+
+
 
 export const getChats = async (userId: string) => {
 	const userChats = await db.query.chats.findMany({

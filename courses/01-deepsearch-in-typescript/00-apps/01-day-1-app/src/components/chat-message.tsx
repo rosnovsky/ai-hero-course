@@ -70,7 +70,6 @@ export const ChatMessage = ({ parts, role, userName }: ChatMessageProps) => {
                 </div>
               );
             }
-            return null; // For other unsupported part types
           })}
         </div>
       </div>

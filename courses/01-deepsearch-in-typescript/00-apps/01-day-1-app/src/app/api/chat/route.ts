@@ -123,19 +123,11 @@ export async function POST(request: Request) {
 						// Generate title for the chat (in case it's a new chat or we want to update it)
 						const title = generateChatTitle(updatedMessages);
 
-						// Save the complete conversation to the database
-						// Store content in parts field as expected by schema
-						const messagesToSave = updatedMessages.map(msg => ({
-							id: msg.id,
-							role: msg.role,
-							content: msg.parts ?? msg.content, // Store in content field for Message type compatibility
-						})) as Message[];
-
 						await upsertChat({
 							userId,
 							chatId: currentChatId,
 							title,
-							messages: messagesToSave,
+							messages: updatedMessages,
 						});
 					} catch (error) {
 						console.error("Error saving chat:", error);
