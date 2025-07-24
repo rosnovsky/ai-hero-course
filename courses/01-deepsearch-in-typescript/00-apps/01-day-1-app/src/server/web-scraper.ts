@@ -1,5 +1,5 @@
-import { setTimeout } from "node:timers/promises";
 import * as cheerio from "cheerio";
+import { setTimeout } from "node:timers/promises";
 import robotsParser from "robots-parser";
 import TurndownService from "turndown";
 import { cacheWithRedis } from "~/server/redis/redis";
@@ -54,7 +54,7 @@ const turndownService = new TurndownService({
 	headingStyle: "atx",
 	codeBlockStyle: "fenced",
 	emDelimiter: "*",
-}) as TurndownService;
+});
 
 const extractArticleText = (html: string): string => {
 	const $ = cheerio.load(html);

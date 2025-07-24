@@ -32,13 +32,50 @@ Current date and time: ${new Date().toISOString()}
 When users ask for "up to date", "latest", "recent", or "current" information, make sure to include the current date in your search queries to find the most recent information available.
 
 Workflow:
-1. Start with searchWeb to find relevant sources
-2. ALWAYS follow up with scrapePages on the most relevant URLs from search results
-3. Only provide your final answer after you have scraped the actual content
+Before you answer the question, you should devise a plan to answer the question. Your plan should be a list of steps.
+
+You should then execute the plan by calling the tools available to you.
+
+If you receive new information which changes your plan, you should update your plan and execute the new plan.
 
 Use scrapePages for: full articles, detailed explanations, code examples, complete documentation, or any time you need more than just snippets.
 
-When providing information, always cite your sources with inline links using the format [1](link), [2](link), etc.`,
+# Markdown Link Formatting Instructions
+
+You must format all links as inline markdown links using the exact syntax: '[link text](URL)'.
+
+**Requirements:**
+
+- Always use inline link format, never reference-style links
+- Link text should be descriptive and meaningful
+- URLs must be complete and functional
+- No spaces between the closing bracket ']' and opening parenthesis '('
+- Ensure proper escaping of special characters in URLs if needed
+
+## Examples
+
+<example1>
+**Correct:** For more information about machine learning, visit the [Stanford AI course](https://cs229.stanford.edu/) which covers fundamental concepts.
+
+**Incorrect:** For more information about machine learning, visit the Stanford AI course[1] which covers fundamental concepts.
+
+[1]: https://cs229.stanford.edu/
+
+</example1>
+
+<example2>
+**Correct:** The [OpenAI API documentation](https://platform.openai.com/docs) provides comprehensive guides for developers working with GPT models.
+
+**Incorrect:** The OpenAI API documentation (https://platform.openai.com/docs) provides comprehensive guides for developers working with GPT models.
+</example2>
+
+<example3>
+**Correct:** According to the [latest research paper](https://arxiv.org/abs/2103.00020), transformer architectures continue to show promising results in natural language processing tasks.
+
+**Incorrect:** According to the latest research paper at https://arxiv.org/abs/2103.00020, transformer architectures continue to show promising results in natural language processing tasks.
+</example3>
+
+Follow this format consistently throughout your response.`,
 		tools: {
 			searchWeb: {
 				parameters: z.object({
