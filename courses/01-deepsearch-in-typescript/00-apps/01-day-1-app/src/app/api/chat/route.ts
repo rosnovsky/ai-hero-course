@@ -1,6 +1,7 @@
 import type { Message } from "ai";
 import { appendResponseMessages, createDataStreamResponse, streamText } from "ai";
 import { z } from "zod";
+import { generateChatTitle } from "~/lib/helpers";
 import { model } from "~/models";
 import { searchSerper } from "~/serper";
 import { auth } from "~/server/auth/index.ts";
@@ -8,21 +9,6 @@ import { getChat, upsertChat } from "~/server/db/chats";
 import { checkRateLimit, recordRequest } from "~/server/rate-limiter";
 
 export const maxDuration = 60;
-
-// Helper function to generate a chat title from the first user message
-function generateChatTitle(messages: Message[]): string {
-	const firstUserMessage = messages.find(msg => msg.role === "user");
-	if (!firstUserMessage) {
-		return "New Chat";
-	}
-
-	const content = typeof firstUserMessage.content === "string"
-		? firstUserMessage.content
-		: "New Chat";
-
-	// Truncate to 50 characters and add ellipsis if needed
-	return content.length > 50 ? content.slice(0, 47) + "..." : content;
-}
 
 export async function POST(request: Request) {
 	const session = await auth();

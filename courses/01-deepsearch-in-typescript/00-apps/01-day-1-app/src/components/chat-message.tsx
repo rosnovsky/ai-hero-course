@@ -65,7 +65,7 @@ export const ChatMessage = ({ parts, role, userName }: ChatMessageProps) => {
                 <div key={index} className="my-2 p-2 border border-gray-600 rounded">
                   <p className="font-semibold">Tool Invocation ({state}): {toolName}</p>
                   <pre className="whitespace-pre-wrap text-sm text-gray-400">
-                    {JSON.stringify(state === "result" ? part.toolInvocation.args : null, null, 2)}
+                    {JSON.stringify(state === "result" ? part.toolInvocation.result : null, null, 2)}
                   </pre>
                 </div>
               );
