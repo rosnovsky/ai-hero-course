@@ -1,12 +1,28 @@
 import type { Message } from "ai";
-import { createDataStreamResponse, streamText } from "ai";
+import { appendResponseMessages, createDataStreamResponse, streamText } from "ai";
 import { z } from "zod";
 import { model } from "~/models";
 import { searchSerper } from "~/serper";
 import { auth } from "~/server/auth/index.ts";
+import { getChat, upsertChat } from "~/server/db/chats";
 import { checkRateLimit, recordRequest } from "~/server/rate-limiter";
 
 export const maxDuration = 60;
+
+// Helper function to generate a chat title from the first user message
+function generateChatTitle(messages: Message[]): string {
+	const firstUserMessage = messages.find(msg => msg.role === "user");
+	if (!firstUserMessage) {
+		return "New Chat";
+	}
+
+	const content = typeof firstUserMessage.content === "string"
+		? firstUserMessage.content
+		: "New Chat";
+
+	// Truncate to 50 characters and add ellipsis if needed
+	return content.length > 50 ? content.slice(0, 47) + "..." : content;
+}
 
 export async function POST(request: Request) {
 	const session = await auth();
@@ -28,12 +44,41 @@ export async function POST(request: Request) {
 
 	const body = (await request.json()) as {
 		messages: Array<Message>;
+		chatId?: string;
 	};
+
+	const { messages, chatId } = body;
+
+	// Create or identify the chat before starting the stream
+	let currentChatId = chatId;
+
+	// If chatId is provided, verify it belongs to the authenticated user
+	if (currentChatId) {
+		const existingChat = await getChat(currentChatId, userId);
+		if (!existingChat) {
+			return new Response("Chat not found or unauthorized", { status: 404 });
+		}
+	}
+
+	if (!currentChatId) {
+		// Generate a new chat ID if none provided
+		currentChatId = crypto.randomUUID();
+
+
+
+		// Create the chat immediately with the user's message
+		// This protects against broken streams
+		const title = generateChatTitle(messages);
+		await upsertChat({
+			userId,
+			chatId: currentChatId,
+			title,
+			messages: messages.filter(msg => msg.role === "user"), // Only save user messages initially
+		});
+	}
 
 	return createDataStreamResponse({
 		execute: async (dataStream) => {
-			const { messages } = body;
-
 			const result = streamText({
 				model,
 				messages,
@@ -57,6 +102,38 @@ export async function POST(request: Request) {
 							}));
 						},
 					},
+				},
+				onFinish: async ({ response }) => {
+					try {
+						const responseMessages = response.messages;
+
+						// Use appendResponseMessages to properly merge the messages
+						const updatedMessages = appendResponseMessages({
+							messages,
+							responseMessages,
+						});
+
+						// Generate title for the chat (in case it's a new chat or we want to update it)
+						const title = generateChatTitle(updatedMessages);
+
+						// Save the complete conversation to the database
+						// We only save the 'parts' property as mentioned in the requirements
+						const messagesToSave = updatedMessages.map(msg => ({
+							id: msg.id,
+							role: msg.role,
+							content: msg.parts ?? msg.content, // Use parts if available, fallback to content
+						})) as Message[];
+
+						await upsertChat({
+							userId,
+							chatId: currentChatId,
+							title,
+							messages: messagesToSave,
+						});
+					} catch (error) {
+						console.error("Error saving chat:", error);
+						// Don't throw here to avoid breaking the stream response
+					}
 				},
 			});
 
