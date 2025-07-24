@@ -4,6 +4,7 @@ import { z } from "zod";
 import { model } from "~/models";
 import { searchSerper } from "~/serper";
 import { auth } from "~/server/auth/index.ts";
+import { checkRateLimit, recordRequest } from "~/server/rate-limiter";
 
 export const maxDuration = 60;
 
@@ -13,6 +14,17 @@ export async function POST(request: Request) {
 	if (!session?.user) {
 		return new Response("Unauthorized", { status: 401 });
 	}
+
+	const userId = session.user.id;
+
+	const canMakeRequest = await checkRateLimit(userId);
+	console.debug({ canMakeRequest})
+
+	if (!canMakeRequest) {
+		return new Response("Too Many Requests", { status: 429 });
+	}
+
+	await recordRequest(userId);
 
 	const body = (await request.json()) as {
 		messages: Array<Message>;
