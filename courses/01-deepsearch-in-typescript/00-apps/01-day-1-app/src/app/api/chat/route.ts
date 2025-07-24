@@ -1,8 +1,8 @@
 import type { Message } from "ai";
 import {
-	appendResponseMessages,
-	createDataStreamResponse,
-	streamText,
+    appendResponseMessages,
+    createDataStreamResponse,
+    streamText,
 } from "ai";
 import { Langfuse } from "langfuse";
 import { z } from "zod";
@@ -13,12 +13,20 @@ import { searchSerper } from "~/serper";
 import { auth } from "~/server/auth/index.ts";
 import { getChat, upsertChat } from "~/server/db/chats";
 import { checkRateLimit, recordRequest } from "~/server/rate-limiter";
+import { cacheWithRedis } from "~/server/redis/redis";
+import { bulkCrawlWebsites } from "~/server/web-scraper";
 
 const langfuse = new Langfuse({
 	environment: env.NODE_ENV,
 });
 
 export const maxDuration = 60;
+
+// Cache the bulk crawl function
+const cachedBulkCrawlWebsites = cacheWithRedis(
+	"scrapePages",
+	bulkCrawlWebsites,
+);
 
 export async function POST(request: Request) {
 	const session = await auth();
@@ -99,7 +107,17 @@ export async function POST(request: Request) {
 						langfuseTraceId: trace.id,
 					},
 				},
-				system: `You are a helpful assistant. Always try to answer user questions by searching the web using the 'searchWeb' tool. When providing information, always cite your sources with inline links using the format [1](link), [2](link), etc., corresponding to the search results.`,
+				system: `You are a helpful assistant with access to two powerful tools:
+
+1. 'searchWeb' - Use this first to find relevant web pages and get snippets
+2. 'scrapePages' - Use this when you need the full content from specific pages found in search results
+
+Workflow:
+- Always start with searchWeb to find relevant sources
+- If the search snippets don't provide enough detail to fully answer the question, use scrapePages to get complete content from the most promising URLs
+- Use scrapePages when you need: full articles, detailed explanations, code examples, or comprehensive information that snippets can't provide
+
+When providing information, always cite your sources with inline links using the format [1](link), [2](link), etc.`,
 				tools: {
 					searchWeb: {
 						parameters: z.object({
@@ -116,6 +134,14 @@ export async function POST(request: Request) {
 								link: result.link,
 								snippet: result.snippet,
 							}));
+						},
+					},
+					scrapePages: {
+						parameters: z.object({
+							urls: z.array(z.string()).describe("URLs to scrape"),
+						}),
+						execute: async ({ urls }: { urls: string[] }) => {
+							return await cachedBulkCrawlWebsites({ urls });
 						},
 					},
 				},
