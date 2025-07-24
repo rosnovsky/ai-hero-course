@@ -2,16 +2,34 @@
 
 import { useChat } from "@ai-sdk/react";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
+import { isNewChatCreated } from "~/lib/chat-utils";
 
 interface ChatProps {
   userName: string;
+  chatId?: string;
 }
 
-export const ChatPage = ({ userName }: ChatProps) => {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } =
-    useChat();
+export const ChatPage = ({ userName, chatId }: ChatProps) => {
+  const router = useRouter();
+  const { messages, input, handleInputChange, handleSubmit, isLoading, data } =
+    useChat({
+      api: '/api/chat',
+      body: {
+        chatId,
+      },
+    });
+
+  useEffect(() => {
+    const lastDataItem = data?.[data.length - 1];
+
+    if (lastDataItem && isNewChatCreated(lastDataItem)) {
+      router.push(`/chat/${lastDataItem.chatId}`);
+    }
+  }, [data, router]);
 
   return (
     <>
@@ -60,7 +78,9 @@ export const ChatPage = ({ userName }: ChatProps) => {
         </div>
       </div>
 
-      <SignInModal isOpen={false} onClose={() => {}} />
+      <SignInModal isOpen={false} onClose={() => {
+        // No-op for now since modal is always closed
+      }} />
     </>
   );
 };

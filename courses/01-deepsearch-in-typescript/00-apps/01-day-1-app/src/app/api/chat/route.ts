@@ -51,6 +51,7 @@ export async function POST(request: Request) {
 
 	// Create or identify the chat before starting the stream
 	let currentChatId = chatId;
+	let isNewChat = false;
 
 	// If chatId is provided, verify it belongs to the authenticated user
 	if (currentChatId) {
@@ -63,8 +64,7 @@ export async function POST(request: Request) {
 	if (!currentChatId) {
 		// Generate a new chat ID if none provided
 		currentChatId = crypto.randomUUID();
-
-
+		isNewChat = true;
 
 		// Create the chat immediately with the user's message
 		// This protects against broken streams
@@ -79,6 +79,13 @@ export async function POST(request: Request) {
 
 	return createDataStreamResponse({
 		execute: async (dataStream) => {
+			if (isNewChat) {
+				dataStream.writeData({
+					type: "NEW_CHAT_CREATED",
+					chatId: currentChatId,
+				});
+			}
+
 			const result = streamText({
 				model,
 				messages,
@@ -117,11 +124,11 @@ export async function POST(request: Request) {
 						const title = generateChatTitle(updatedMessages);
 
 						// Save the complete conversation to the database
-						// We only save the 'parts' property as mentioned in the requirements
+						// Store content in parts field as expected by schema
 						const messagesToSave = updatedMessages.map(msg => ({
 							id: msg.id,
 							role: msg.role,
-							content: msg.parts ?? msg.content, // Use parts if available, fallback to content
+							content: msg.parts ?? msg.content, // Store in content field for Message type compatibility
 						})) as Message[];
 
 						await upsertChat({
