@@ -37,14 +37,34 @@ export async function POST(request: Request) {
 
 	const userId = session.user.id;
 
+	// Create trace at the beginning
+	const trace = langfuse.trace({
+		name: "chat",
+		userId: session.user.id,
+	});
+
+	const rateLimitSpan = trace.span({
+		name: "check-rate-limit",
+		input: { userId },
+	});
 	const canMakeRequest = await checkRateLimit(userId);
+	rateLimitSpan.end({
+		output: { canMakeRequest },
+	});
 	console.debug({ canMakeRequest });
 
 	if (!canMakeRequest) {
 		return new Response("Too Many Requests", { status: 429 });
 	}
 
+	const recordRequestSpan = trace.span({
+		name: "record-request",
+		input: { userId },
+	});
 	await recordRequest(userId);
+	recordRequestSpan.end({
+		output: { success: true },
+	});
 
 	const body = (await request.json()) as {
 		messages: Array<Message>;
@@ -59,7 +79,14 @@ export async function POST(request: Request) {
 
 	// If chatId is provided, verify it belongs to the authenticated user
 	if (currentChatId) {
+		const getChatSpan = trace.span({
+			name: "get-existing-chat",
+			input: { chatId: currentChatId, userId },
+		});
 		const existingChat = await getChat(currentChatId, userId);
+		getChatSpan.end({
+			output: { existingChat: existingChat ? { id: existingChat.id, title: existingChat.title } : null },
+		});
 		if (!existingChat) {
 			return new Response("Chat not found or unauthorized", { status: 404 });
 		}
@@ -73,18 +100,29 @@ export async function POST(request: Request) {
 		// Create the chat immediately with the user's message
 		// This protects against broken streams
 		const title = generateChatTitle(messages);
+		const createChatSpan = trace.span({
+			name: "create-new-chat",
+			input: {
+				userId,
+				chatId: currentChatId,
+				title,
+				messageCount: messages.filter((msg) => msg.role === "user").length,
+			},
+		});
 		await upsertChat({
 			userId,
 			chatId: currentChatId,
 			title,
 			messages: messages.filter((msg) => msg.role === "user"), // Only save user messages initially
 		});
+		createChatSpan.end({
+			output: { success: true, chatId: currentChatId },
+		});
 	}
 
-	const trace = langfuse.trace({
+	// Update the trace with the sessionId once we have the chatId
+	trace.update({
 		sessionId: currentChatId,
-		name: "chat",
-		userId: session.user.id,
 	});
 
 	return createDataStreamResponse({
@@ -170,11 +208,23 @@ When providing information, always cite your sources with inline links using the
 						// Generate title for the chat (in case it's a new chat or we want to update it)
 						const title = generateChatTitle(updatedMessages);
 
+						const saveChatSpan = trace.span({
+							name: "save-chat-completion",
+							input: {
+								userId,
+								chatId: currentChatId,
+								title,
+								messageCount: updatedMessages.length,
+							},
+						});
 						await upsertChat({
 							userId,
 							chatId: currentChatId,
 							title,
 							messages: updatedMessages,
+						});
+						saveChatSpan.end({
+							output: { success: true, chatId: currentChatId },
 						});
 
 						await langfuse.flushAsync();
