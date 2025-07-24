@@ -1,5 +1,5 @@
-import * as cheerio from "cheerio";
 import { setTimeout } from "node:timers/promises";
+import * as cheerio from "cheerio";
 import robotsParser from "robots-parser";
 import TurndownService from "turndown";
 import { cacheWithRedis } from "~/server/redis/redis";
@@ -167,6 +167,7 @@ export const crawlWebsite = cacheWithRedis(
 
 		while (attempts < maxRetries) {
 			try {
+				console.debug(`Scraping ${url}`);
 				const response = await fetch(url);
 
 				if (response.ok) {

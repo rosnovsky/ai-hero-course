@@ -1,13 +1,17 @@
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "~/server/auth/index.ts";
 import { getChats } from "~/server/db/chats.ts";
 import { AuthButton } from "../components/auth-button.tsx";
 
 export default async function HomePage() {
 	const session = await auth();
+	if (!session?.user) {
+		return redirect("/login");
+	}
 	const isAuthenticated = !!session?.user;
-	const chats = await getChats(session!.user.id);
+	const chats = await getChats(session.user.id);
 
 	return (
 		<div className="flex h-screen bg-gray-950">

@@ -110,12 +110,16 @@ export async function POST(request: Request) {
 				system: `You are a helpful assistant with access to two powerful tools:
 
 1. 'searchWeb' - Use this first to find relevant web pages and get snippets
-2. 'scrapePages' - Use this when you need the full content from specific pages found in search results
+2. 'scrapePages' - Use this to get the full content from web pages
+
+IMPORTANT: You MUST use scrapePages after searchWeb to get complete information. Search snippets are often incomplete.
 
 Workflow:
-- Always start with searchWeb to find relevant sources
-- If the search snippets don't provide enough detail to fully answer the question, use scrapePages to get complete content from the most promising URLs
-- Use scrapePages when you need: full articles, detailed explanations, code examples, or comprehensive information that snippets can't provide
+1. Start with searchWeb to find relevant sources
+2. ALWAYS follow up with scrapePages on the most relevant URLs from search results
+3. Only provide your final answer after you have scraped the actual content
+
+Use scrapePages for: full articles, detailed explanations, code examples, complete documentation, or any time you need more than just snippets.
 
 When providing information, always cite your sources with inline links using the format [1](link), [2](link), etc.`,
 				tools: {
@@ -141,7 +145,10 @@ When providing information, always cite your sources with inline links using the
 							urls: z.array(z.string()).describe("URLs to scrape"),
 						}),
 						execute: async ({ urls }: { urls: string[] }) => {
-							return await cachedBulkCrawlWebsites({ urls });
+							console.log("🕷️ scrapePages tool called with URLs:", urls);
+							const result = await cachedBulkCrawlWebsites({ urls });
+							console.log("🕷️ scrapePages result:", result);
+							return result;
 						},
 					},
 				},
