@@ -1,5 +1,6 @@
 import { type Message, streamText, type TelemetrySettings } from "ai";
 import { z } from "zod";
+import { env } from "~/env";
 import { model } from "~/models";
 import { searchSerper } from "~/serper";
 import { cacheWithRedis } from "~/server/redis/redis";
@@ -84,7 +85,7 @@ Follow this format consistently throughout your response.`,
 
 					try {
 						const results = await searchSerper(
-							{ q: query, num: 10 },
+							{ q: query, num: env.SEARCH_RESULTS_COUNT },
 							abortSignal,
 						);
 
