@@ -1,3 +1,5 @@
+import type { RequestHints } from "~/lib/request-hints";
+
 type QueryResultSearchResult = {
   date: string;
   title: string;
@@ -36,6 +38,11 @@ export class SystemContext {
   private userQuestion = "";
 
   /**
+   * The user's location hints
+   */
+  private requestHints?: RequestHints;
+
+  /**
    * The history of all queries searched
    */
   private queryHistory: QueryResult[] = [];
@@ -45,8 +52,9 @@ export class SystemContext {
    */
   private scrapeHistory: ScrapeResult[] = [];
 
-  constructor(userQuestion = "") {
+  constructor(userQuestion = "", requestHints?: RequestHints) {
     this.userQuestion = userQuestion;
+    this.requestHints = requestHints;
   }
 
   shouldStop() {
@@ -112,6 +120,17 @@ export class SystemContext {
 
     if (this.userQuestion) {
       parts.push(`## User Question\n${this.userQuestion}`);
+    }
+
+    if (this.requestHints && (this.requestHints.latitude || this.requestHints.longitude || this.requestHints.city || this.requestHints.country)) {
+      const locationInfo = [
+        this.requestHints.latitude && `- lat: ${this.requestHints.latitude}`,
+        this.requestHints.longitude && `- lon: ${this.requestHints.longitude}`,
+        this.requestHints.city && `- city: ${this.requestHints.city}`,
+        this.requestHints.country && `- country: ${this.requestHints.country}`,
+      ].filter(Boolean).join("\n");
+
+      parts.push(`## User Location\n${locationInfo}`);
     }
 
     if (this.queryHistory.length > 0) {

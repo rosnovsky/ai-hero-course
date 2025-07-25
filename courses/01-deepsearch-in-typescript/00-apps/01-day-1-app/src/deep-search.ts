@@ -5,6 +5,8 @@ import {
   type TelemetrySettings,
 } from "ai";
 import { actionSchema } from "~/action-types";
+import type { RequestHints } from "~/lib/request-hints";
+import { getRequestPromptFromHints } from "~/lib/request-hints";
 import type { OurMessageAnnotation } from "~/message-annotation";
 import { model } from "~/models";
 import { runAgentLoop } from "~/run-agent-loop";
@@ -66,6 +68,7 @@ export const streamFromDeepSearch = async (opts: {
 	onFinish: Parameters<typeof streamText>[0]["onFinish"];
 	telemetry: TelemetrySettings;
 	writeMessageAnnotation: (annotation: OurMessageAnnotation) => void;
+	requestHints?: RequestHints;
 }) => {
 	console.log(
 		"🚀 streamFromDeepSearch started with messages:",
@@ -82,7 +85,7 @@ export const streamFromDeepSearch = async (opts: {
 
 	console.log("❓ Extracted question:", question);
 	// Create system context with the question
-	const context = new SystemContext(question);
+	const context = new SystemContext(question, opts.requestHints);
 
 	console.log("📋 Created system context");
 
@@ -101,11 +104,12 @@ export const streamFromDeepSearch = async (opts: {
 	console.log("✅ runAgentLoop completed, now streaming final answer");
 
 	// Now stream the final answer using the built context and full conversation history
+	const locationContext = opts.requestHints ? getRequestPromptFromHints(opts.requestHints) : "";
 	const systemPrompt = `You are a helpful AI assistant that provides comprehensive, well-researched answers based on the information gathered from web searches and page scraping.
 
 Current date and time: ${new Date().toISOString()}
 
-Your task is to answer the user's question using the search results and scraped content provided below, while maintaining context from the conversation history.
+${locationContext ? locationContext + '\n' : ''}Your task is to answer the user's question using the search results and scraped content provided below, while maintaining context from the conversation history.
 
 Guidelines for your response:
 - Provide a comprehensive, well-structured answer that directly addresses the user's question
@@ -156,7 +160,7 @@ Remember: Your goal is to provide a helpful, accurate, and well-sourced answer t
 	});
 };
 
-export async function askDeepSearch(messages: Message[]): Promise<string> {
+export async function askDeepSearch(messages: Message[], requestHints?: RequestHints): Promise<string> {
 	console.log("🔍 askDeepSearch called with messages:", messages.length);
 
 	try {
@@ -171,6 +175,7 @@ export async function askDeepSearch(messages: Message[]): Promise<string> {
 			writeMessageAnnotation: () => {
 				// no-op
 			},
+			requestHints,
 		});
 
 		console.log("📊 Agent loop completed, consuming stream...");

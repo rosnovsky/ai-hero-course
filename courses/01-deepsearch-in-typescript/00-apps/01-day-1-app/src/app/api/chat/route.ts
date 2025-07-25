@@ -4,6 +4,7 @@ import { Langfuse } from "langfuse";
 import { streamFromDeepSearch } from "~/deep-search";
 import { env } from "~/env";
 import { generateChatTitle } from "~/lib/helpers";
+import { getRequestHints } from "~/lib/request-hints";
 import type { OurMessageAnnotation } from "~/message-annotation";
 import { auth } from "~/server/auth/index.ts";
 import { getChat, upsertChat } from "~/server/db/chats";
@@ -24,6 +25,10 @@ export async function POST(request: Request) {
 	}
 
 	const userId = session.user.id;
+
+	// Get location hints from request
+	const requestHints = getRequestHints(request);
+	console.log("Request hints:", requestHints);
 
 	// Create trace at the beginning
 	const trace = langfuse.trace({
@@ -160,6 +165,7 @@ export async function POST(request: Request) {
 			const result = await streamFromDeepSearch({
 				messages,
 				writeMessageAnnotation,
+				requestHints,
 				onFinish: async ({ response }) => {
 					try {
 						const responseMessages = response.messages;
@@ -202,7 +208,7 @@ export async function POST(request: Request) {
 							output: { success: true, chatId: currentChatId },
 						});
 
-						await langfuse.flushAsync();
+
 					} catch (error) {
 						console.error("Error saving chat:", error);
 						// Don't throw here to avoid breaking the stream response
