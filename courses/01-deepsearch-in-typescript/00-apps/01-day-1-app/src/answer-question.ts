@@ -4,13 +4,14 @@ import type { SystemContext } from "~/system-context";
 
 interface AnswerQuestionOptions {
 	isFinal?: boolean;
+	onFinish?: Parameters<typeof streamText>[0]["onFinish"];
 }
 
 export const answerQuestion = (
 	ctx: SystemContext,
 	options: AnswerQuestionOptions = {},
 ) => {
-	const { isFinal = false } = options;
+	const { isFinal = false, onFinish } = options;
 
 	const systemPrompt = `You are a helpful AI assistant that provides comprehensive, well-researched answers based on the information gathered from web searches and page scraping.
 
@@ -43,5 +44,6 @@ Remember: Your goal is to provide a helpful, accurate, and well-sourced answer t
 		model,
 		system: systemPrompt,
 		prompt: ctx.getFullContext(),
+		onFinish,
 	});
 };

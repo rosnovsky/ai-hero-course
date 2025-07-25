@@ -1,5 +1,6 @@
 import type { Message } from "@ai-sdk/react";
 import { and, eq } from "drizzle-orm";
+import type { OurMessageAnnotation } from "~/message-annotation";
 import { db } from "~/server/db";
 import { chats, messages } from "~/server/db/schema";
 
@@ -70,6 +71,7 @@ export const upsertChat = async (opts: {
 						chatId,
 						role: msg.role,
 						parts, // Store normalized parts array
+						annotations: (msg as Message & { annotations?: OurMessageAnnotation[] }).annotations ?? null, // Store annotations if present
 						order: index,
 					};
 				}),

@@ -40,6 +40,8 @@ export default async function ChatPageRoute({ params }: ChatPageProps) {
 		// parts are always present, and the AI SDK
 		// will use the parts to construct the content
 		content: "",
+		// Include annotations if they exist
+		annotations: msg.annotations,
 	})) ?? [];
 
 	return <ChatPage userName={userName} chatId={chatId} initialMessages={initialMessages} />;

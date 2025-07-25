@@ -4,6 +4,7 @@ import { Langfuse } from "langfuse";
 import { streamFromDeepSearch } from "~/deep-search";
 import { env } from "~/env";
 import { generateChatTitle } from "~/lib/helpers";
+import type { OurMessageAnnotation } from "~/message-annotation";
 import { auth } from "~/server/auth/index.ts";
 import { getChat, upsertChat } from "~/server/db/chats";
 import type { RateLimitConfig } from "~/server/global-rate-limiter";
@@ -140,6 +141,8 @@ export async function POST(request: Request) {
 
 	return createDataStreamResponse({
 		execute: async (dataStream) => {
+			const annotations: OurMessageAnnotation[] = [];
+
 			if (isNewChat) {
 				dataStream.writeData({
 					type: "NEW_CHAT_CREATED",
@@ -147,11 +150,16 @@ export async function POST(request: Request) {
 				});
 			}
 
+			const writeMessageAnnotation = (annotation: OurMessageAnnotation) => {
+				// Save the annotation in-memory
+				annotations.push(annotation);
+				// Send it to the client
+				dataStream.writeMessageAnnotation(annotation as unknown as JSONValue);
+			};
+
 			const result = await streamFromDeepSearch({
 				messages,
-				writeMessageAnnotation: (annotation) => {
-					dataStream.writeMessageAnnotation(annotation as unknown as JSONValue);
-				},
+				writeMessageAnnotation,
 				onFinish: async ({ response }) => {
 					try {
 						const responseMessages = response.messages;
@@ -162,8 +170,18 @@ export async function POST(request: Request) {
 							responseMessages,
 						});
 
+						// Create a copy for database persistence to avoid modifying the original response
+						const messagesToSave = updatedMessages.map(msg => ({ ...msg }));
+
+						// Get the last message and add annotations to it (only for database persistence)
+						const lastMessage = messagesToSave[messagesToSave.length - 1];
+						if (lastMessage && annotations.length > 0) {
+							// Add the annotations to the last message copy
+							(lastMessage as unknown as Record<string, unknown>).annotations = annotations;
+						}
+
 						// Generate title for the chat (in case it's a new chat or we want to update it)
-						const title = generateChatTitle(updatedMessages);
+						const title = generateChatTitle(messagesToSave);
 
 						const saveChatSpan = trace.span({
 							name: "save-chat-completion",
@@ -171,14 +189,14 @@ export async function POST(request: Request) {
 								userId,
 								chatId: currentChatId,
 								title,
-								messageCount: updatedMessages.length,
+								messageCount: messagesToSave.length,
 							},
 						});
 						await upsertChat({
 							userId,
 							chatId: currentChatId,
 							title,
-							messages: updatedMessages,
+							messages: messagesToSave,
 						});
 						saveChatSpan.end({
 							output: { success: true, chatId: currentChatId },
