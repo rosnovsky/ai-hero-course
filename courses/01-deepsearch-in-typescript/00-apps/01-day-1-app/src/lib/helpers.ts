@@ -29,7 +29,7 @@ export const generateChatTitle = (messages: Message[]): string => {
      return "New Chat";
    }
 
-   const title = firstUserMessage.content.slice(0, 50);
+   const title = firstUserMessage.parts?.[0]?.type === "text" ? firstUserMessage.parts[0].text : "New Chat";
    // Append ellipsis if the original message was longer
    return firstUserMessage.content.length > 50 ? `${title}...` : title;
  };;

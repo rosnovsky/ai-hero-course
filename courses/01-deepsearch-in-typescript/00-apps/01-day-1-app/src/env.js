@@ -14,6 +14,7 @@ export const env = createEnv({
         : z.string().optional(),
     DATABASE_URL: z.string().url(),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string(),
+    OPENAI_API_KEY: z.string(),
     SERPER_API_KEY: z.string(),
     SEARCH_RESULTS_COUNT: z.coerce.number().default(3),
     LANGFUSE_SECRET_KEY: z.string(),
@@ -48,6 +49,7 @@ export const env = createEnv({
     LANGFUSE_BASEURL: process.env.LANGFUSE_BASEURL,
     EVAL_DATASET: process.env.EVAL_DATASET,
     NODE_ENV: process.env.NODE_ENV,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

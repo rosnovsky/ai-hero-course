@@ -51,9 +51,9 @@ ${context.getFullContext()}`,
 		experimental_telemetry: {
 			isEnabled: !!langfuseTraceId,
 			functionId: "get-next-action",
-			metadata: {
+			metadata: langfuseTraceId ? {
 				langfuseTraceId,
-			},
+			} : {},
 		},
 	});
 
@@ -71,15 +71,19 @@ export const streamFromDeepSearch = async (opts: {
 		"🚀 streamFromDeepSearch started with messages:",
 		opts.messages.length,
 	);
-
 	// Extract the user's question from the last message
-	const lastMessage = opts.messages[opts.messages.length - 1];
+	const lastMessage = opts.messages.length > 0 ? opts.messages[opts.messages.length - 1] : null;
 	const question = lastMessage?.content ?? "";
 
-	console.log("❓ Extracted question:", question);
+	// Handle edge case where there are no messages yet
+	if (opts.messages.length === 0) {
+		console.log("⚠️ No messages provided, using empty question");
+	}
 
+	console.log("❓ Extracted question:", question);
 	// Create system context with the question
 	const context = new SystemContext(question);
+
 	console.log("📋 Created system context");
 
 	const langfuseTraceId =
@@ -96,12 +100,12 @@ export const streamFromDeepSearch = async (opts: {
 	});
 	console.log("✅ runAgentLoop completed, now streaming final answer");
 
-	// Now stream the final answer using the built context
+	// Now stream the final answer using the built context and full conversation history
 	const systemPrompt = `You are a helpful AI assistant that provides comprehensive, well-researched answers based on the information gathered from web searches and page scraping.
 
 Current date and time: ${new Date().toISOString()}
 
-Your task is to answer the user's question using the search results and scraped content provided in the context.
+Your task is to answer the user's question using the search results and scraped content provided below, while maintaining context from the conversation history.
 
 Guidelines for your response:
 - Provide a comprehensive, well-structured answer that directly addresses the user's question
@@ -110,18 +114,40 @@ Guidelines for your response:
 - If multiple sources provide conflicting information, acknowledge the discrepancies and explain them
 - Structure your response with clear headings and bullet points where appropriate
 - Be factual and avoid speculation beyond what the sources support
+- Consider the full conversation context when formulating your response
 
 When formatting links, always use inline markdown format: [link text](URL)
 - Make the link text descriptive and meaningful
 - Ensure URLs are complete and functional
 - Use this format consistently throughout your response
 
-Remember: Your goal is to provide a helpful, accurate, and well-sourced answer that directly addresses the user's question.`;
+## Research Context
+
+${context.getFullContext()}
+
+Remember: Your goal is to provide a helpful, accurate, and well-sourced answer that directly addresses the user's question while considering the full conversation context.`;
+
+	// Create messages array with system message and conversation history
+	const messagesWithContext = [
+		{
+			role: "system" as const,
+			content: systemPrompt,
+		},
+		...opts.messages,
+	];
+
+	// Handle edge case where there are no user messages yet
+	if (opts.messages.length === 0) {
+		messagesWithContext.push({
+			id: crypto.randomUUID(),
+			role: "user" as const,
+			content: "Please provide a helpful introduction or ask how you can assist me.",
+		});
+	}
 
 	return streamText({
 		model,
-		system: systemPrompt,
-		prompt: context.getFullContext(),
+		messages: messagesWithContext,
 		onFinish: opts.onFinish,
 		experimental_telemetry: {
 			...opts.telemetry,
