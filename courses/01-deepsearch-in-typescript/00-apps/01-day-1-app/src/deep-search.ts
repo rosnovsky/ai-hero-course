@@ -1,10 +1,12 @@
 import {
-    generateObject,
-    type Message,
-    streamText,
-    type TelemetrySettings,
+	generateObject,
+	type Message,
+	streamText,
+	type TelemetrySettings,
 } from "ai";
+import type { Action } from "~/action-types";
 import { actionSchema } from "~/action-types";
+import type { OurMessageAnnotation } from "~/message-annotation";
 import { model } from "~/models";
 import { runAgentLoop } from "~/run-agent-loop";
 import { SystemContext } from "~/system-context";
@@ -55,8 +57,12 @@ export const streamFromDeepSearch = async (opts: {
 	messages: Message[];
 	onFinish: Parameters<typeof streamText>[0]["onFinish"];
 	telemetry: TelemetrySettings;
+	writeMessageAnnotation: (annotation: OurMessageAnnotation) => void;
 }) => {
-	console.log("🚀 streamFromDeepSearch started with messages:", opts.messages.length);
+	console.log(
+		"🚀 streamFromDeepSearch started with messages:",
+		opts.messages.length,
+	);
 
 	// Extract the user's question from the last message
 	const lastMessage = opts.messages[opts.messages.length - 1];
@@ -70,7 +76,10 @@ export const streamFromDeepSearch = async (opts: {
 
 	// Run the agent loop to build the context
 	console.log("🔄 About to call runAgentLoop");
-	await runAgentLoop(context);
+	await runAgentLoop({
+		context,
+		writeMessageAnnotation: opts.writeMessageAnnotation,
+	});
 	console.log("✅ runAgentLoop completed, now streaming final answer");
 
 	// Now stream the final answer using the built context
@@ -104,7 +113,7 @@ Remember: Your goal is to provide a helpful, accurate, and well-sourced answer t
 	});
 };
 
-export async function askDeepSearch(messages: Message[]) {
+export async function askDeepSearch(messages: Message[]): Promise<string> {
 	console.log("🔍 askDeepSearch called with messages:", messages.length);
 
 	try {
@@ -115,6 +124,9 @@ export async function askDeepSearch(messages: Message[]) {
 			},
 			telemetry: {
 				isEnabled: false,
+			},
+			writeMessageAnnotation: () => {
+				// no-op
 			},
 		});
 

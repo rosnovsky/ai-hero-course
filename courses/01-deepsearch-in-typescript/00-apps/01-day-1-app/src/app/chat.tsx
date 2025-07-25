@@ -9,6 +9,7 @@ import { StickToBottom } from "use-stick-to-bottom";
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
 import { isNewChatCreated } from "~/lib/helpers";
+import type { OurMessageAnnotation } from "~/message-annotation";
 
 interface ChatProps {
 	userName: string;
@@ -51,6 +52,9 @@ export const ChatPage = ({ userName, chatId, initialMessages }: ChatProps) => {
 									parts={message.parts ?? []}
 									role={message.role}
 									userName={userName}
+									annotations={
+										(message.annotations as OurMessageAnnotation[]) ?? []
+									}
 								/>
 							);
 						})}

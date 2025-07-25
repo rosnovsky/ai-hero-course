@@ -1,5 +1,7 @@
+import type { Action } from "~/action-types";
 import { getNextAction } from "~/deep-search";
 import { env } from "~/env";
+import type { OurMessageAnnotation } from "~/message-annotation";
 import { searchSerper } from "~/serper";
 import { cacheWithRedis } from "~/server/redis/redis";
 import { bulkCrawlWebsites } from "~/server/web-scraper";
@@ -81,17 +83,25 @@ const scrapeUrl = async (urls: string[], maxCharacters?: number) => {
 	}
 };
 
-export const runAgentLoop = async (ctx: SystemContext) => {
+export const runAgentLoop = async (opts: {
+	context: SystemContext;
+	writeMessageAnnotation: (annotation: OurMessageAnnotation) => void;
+}) => {
 	console.log("🔄 Starting agent loop");
 
 	// A loop that continues until we have an answer
 	// or we've taken 10 actions
-	while (!ctx.shouldStop()) {
-		console.log(`🔄 Loop iteration, step: ${ctx.getStep()}`);
+	while (!opts.context.shouldStop()) {
+		console.log(`🔄 Loop iteration, step: ${opts.context.getStep()}`);
 
 		// We choose the next action based on the state of our system
-		const nextAction = await getNextAction(ctx);
+		const nextAction = await getNextAction(opts.context);
 		console.log(`🎯 Next action chosen:`, nextAction);
+
+		opts.writeMessageAnnotation({
+			type: "NEW_ACTION",
+			action: nextAction as Action,
+		});
 
 		// We execute the action and update the state of our system
 		if (nextAction.type === "search") {
@@ -104,7 +114,7 @@ export const runAgentLoop = async (ctx: SystemContext) => {
 			console.log(`✅ Search completed, found ${result.length} results`);
 
 			// Convert to the format expected by SystemContext
-			ctx.reportQueries([
+			opts.context.reportQueries([
 				{
 					query: nextAction.query,
 					results: result.map((r) => ({
@@ -128,7 +138,7 @@ export const runAgentLoop = async (ctx: SystemContext) => {
 
 			// Convert to the format expected by SystemContext
 			if (result.success) {
-				ctx.reportScrapes(
+				opts.context.reportScrapes(
 					result.results.map((r) => ({
 						url: r.url,
 						result: r.result.success
@@ -139,7 +149,7 @@ export const runAgentLoop = async (ctx: SystemContext) => {
 				);
 			} else {
 				// Report failed scrapes
-				ctx.reportScrapes(
+				opts.context.reportScrapes(
 					result.results.map((r) => ({
 						url: r.url,
 						result: r.result.success
@@ -155,7 +165,7 @@ export const runAgentLoop = async (ctx: SystemContext) => {
 		}
 
 		// We increment the step counter
-		ctx.incrementStep();
+		opts.context.incrementStep();
 	}
 
 	// If we've taken 10 actions and still don't have an answer,

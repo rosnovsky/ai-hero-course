@@ -149,6 +149,9 @@ export async function POST(request: Request) {
 
 			const result = await streamFromDeepSearch({
 				messages,
+				writeMessageAnnotation: (annotation) => {
+					dataStream.writeMessageAnnotation(annotation);
+				},
 				onFinish: async ({ response }) => {
 					try {
 						const responseMessages = response.messages;

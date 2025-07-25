@@ -58,7 +58,7 @@ describe("answerQuestion", () => {
 			rawResponse: { headers: {}, response: null },
 		} as unknown as any);
 
-		const result = await answerQuestion(context);
+		const result = answerQuestion(context);
 
 		expect(result).toBe(
 			"Artificial intelligence (AI) is a broad field of computer science focused on creating intelligent machines.",
@@ -97,7 +97,7 @@ describe("answerQuestion", () => {
 			text: "Based on the available information, machine learning is a subset of artificial intelligence.",
 		} as unknown as any);
 
-		const result = await answerQuestion(context, { isFinal: true });
+		const result = answerQuestion(context, { isFinal: true });
 
 		expect(result).toBe(
 			"Based on the available information, machine learning is a subset of artificial intelligence.",
@@ -119,7 +119,7 @@ describe("answerQuestion", () => {
 			text: "Today's events based on available information.",
 		} as unknown as any);
 
-		await answerQuestion(context);
+		answerQuestion(context);
 
 		// Verify the system prompt includes current date
 		const call = vi.mocked(generateText).mock.calls[0]![0];
@@ -135,7 +135,7 @@ describe("answerQuestion", () => {
 			text: "JavaScript is a programming language.",
 		} as unknown as any);
 
-		await answerQuestion(context);
+		answerQuestion(context);
 
 		// Verify the system prompt includes link formatting instructions
 		const call = vi.mocked(generateText).mock.calls[0]![0];
@@ -173,7 +173,7 @@ describe("answerQuestion", () => {
 			text: "Deep learning explanation based on research.",
 		} as unknown as any);
 
-		await answerQuestion(context);
+		answerQuestion(context);
 
 		// Verify the prompt includes the full context
 		const call = vi.mocked(generateText).mock.calls[0]![0];
@@ -190,7 +190,7 @@ describe("answerQuestion", () => {
 			text: "I don't have enough information to answer this question.",
 		} as unknown as any);
 
-		const result = await answerQuestion(context);
+		const result = answerQuestion(context);
 
 		expect(result).toBe(
 			"I don't have enough information to answer this question.",

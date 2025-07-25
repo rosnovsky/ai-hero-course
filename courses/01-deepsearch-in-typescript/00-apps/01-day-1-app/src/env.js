@@ -15,7 +15,7 @@ export const env = createEnv({
     DATABASE_URL: z.string().url(),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string(),
     SERPER_API_KEY: z.string(),
-    SEARCH_RESULTS_COUNT: z.coerce.number().default(10),
+    SEARCH_RESULTS_COUNT: z.coerce.number().default(3),
     LANGFUSE_SECRET_KEY: z.string(),
     LANGFUSE_PUBLIC_KEY: z.string(),
     LANGFUSE_BASEURL: z.string().url(),
