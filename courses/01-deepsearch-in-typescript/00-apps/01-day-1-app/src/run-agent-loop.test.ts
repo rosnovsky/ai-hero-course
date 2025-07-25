@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -70,13 +71,18 @@ describe("runAgentLoop", () => {
 		});
 
 		// Mock answer response
-		vi.mocked(answerQuestion).mockResolvedValueOnce(
-			"Today's weather is sunny.",
-		);
+		const mockResult = {
+			text: "Today's weather is sunny.",
+			textStream: (async function* () {
+				yield "Today's weather is sunny.";
+			})(),
+			mergeIntoDataStream: vi.fn(),
+		};
+		vi.mocked(answerQuestion).mockReturnValueOnce(mockResult as any);
 
 		const result = await runAgentLoop(context);
 
-		expect(result).toBe("Today's weather is sunny.");
+		expect(result).toBe(mockResult);
 		expect(getNextAction).toHaveBeenCalledTimes(2);
 		expect(searchSerper).toHaveBeenCalledWith(
 			{ q: "weather today", num: 10 },
@@ -114,13 +120,18 @@ describe("runAgentLoop", () => {
 		});
 
 		// Mock answer response
-		vi.mocked(answerQuestion).mockResolvedValueOnce(
-			"AI is artificial intelligence.",
-		);
+		const mockResult = {
+			text: "AI is artificial intelligence.",
+			textStream: (async function* () {
+				yield "AI is artificial intelligence.";
+			})(),
+			mergeIntoDataStream: vi.fn(),
+		};
+		vi.mocked(answerQuestion).mockReturnValueOnce(mockResult as any);
 
 		const result = await runAgentLoop(context);
 
-		expect(result).toBe("AI is artificial intelligence.");
+		expect(result).toBe(mockResult);
 		expect(getNextAction).toHaveBeenCalledTimes(2);
 		expect(bulkCrawlWebsites).toHaveBeenCalledWith({
 			urls: ["https://example.com/ai"],
@@ -138,13 +149,18 @@ describe("runAgentLoop", () => {
 		}
 
 		// Mock final answer
-		vi.mocked(answerQuestion).mockResolvedValueOnce(
-			"Machine learning is a subset of AI.",
-		);
+		const mockResult = {
+			text: "Machine learning is a subset of AI.",
+			textStream: (async function* () {
+				yield "Machine learning is a subset of AI.";
+			})(),
+			mergeIntoDataStream: vi.fn(),
+		};
+		vi.mocked(answerQuestion).mockReturnValueOnce(mockResult as any);
 
 		const result = await runAgentLoop(context);
 
-		expect(result).toBe("Machine learning is a subset of AI.");
+		expect(result).toBe(mockResult);
 		expect(answerQuestion).toHaveBeenCalledWith(context, { isFinal: true });
 		expect(getNextAction).not.toHaveBeenCalled();
 	});
@@ -221,11 +237,18 @@ describe("runAgentLoop", () => {
 		});
 
 		// Mock answer response
-		vi.mocked(answerQuestion).mockResolvedValueOnce("Best effort answer.");
+		const mockResult = {
+			text: "Best effort answer.",
+			textStream: (async function* () {
+				yield "Best effort answer.";
+			})(),
+			mergeIntoDataStream: vi.fn(),
+		};
+		vi.mocked(answerQuestion).mockReturnValueOnce(mockResult as any);
 
 		const result = await runAgentLoop(context);
 
-		expect(result).toBe("Best effort answer.");
+		expect(result).toBe(mockResult);
 		expect(bulkCrawlWebsites).toHaveBeenCalledWith({
 			urls: ["https://example.com"],
 			maxCharacters: undefined,
@@ -283,11 +306,18 @@ describe("runAgentLoop", () => {
 		});
 
 		// Mock answer response
-		vi.mocked(answerQuestion).mockResolvedValueOnce("Comprehensive AI answer.");
+		const mockResult = {
+			text: "Comprehensive AI answer.",
+			textStream: (async function* () {
+				yield "Comprehensive AI answer.";
+			})(),
+			mergeIntoDataStream: vi.fn(),
+		};
+		vi.mocked(answerQuestion).mockReturnValueOnce(mockResult as any);
 
 		const result = await runAgentLoop(context);
 
-		expect(result).toBe("Comprehensive AI answer.");
+		expect(result).toBe(mockResult);
 		expect(getNextAction).toHaveBeenCalledTimes(3);
 		expect(context.getStep()).toBe(2); // Two actions executed
 	});

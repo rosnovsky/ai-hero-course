@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { streamText } from "ai";
 import { model } from "~/models";
 import type { SystemContext } from "~/system-context";
 
@@ -6,10 +6,10 @@ interface AnswerQuestionOptions {
 	isFinal?: boolean;
 }
 
-export const answerQuestion = async (
+export const answerQuestion = (
 	ctx: SystemContext,
 	options: AnswerQuestionOptions = {},
-): Promise<string> => {
+) => {
 	const { isFinal = false } = options;
 
 	const systemPrompt = `You are a helpful AI assistant that provides comprehensive, well-researched answers based on the information gathered from web searches and page scraping.
@@ -39,11 +39,9 @@ When formatting links, always use inline markdown format: [link text](URL)
 
 Remember: Your goal is to provide a helpful, accurate, and well-sourced answer that directly addresses the user's question.`;
 
-	const result = await generateText({
+	return streamText({
 		model,
 		system: systemPrompt,
 		prompt: ctx.getFullContext(),
 	});
-
-	return result.text;
 };

@@ -4,7 +4,6 @@ import { searchSerper } from "~/serper";
 import { cacheWithRedis } from "~/server/redis/redis";
 import { bulkCrawlWebsites } from "~/server/web-scraper";
 import type { SystemContext } from "~/system-context";
-import { answerQuestion } from "./answer-question";
 
 // Cache the bulk crawl function
 const cachedBulkCrawlWebsites = cacheWithRedis(
@@ -82,12 +81,17 @@ const scrapeUrl = async (urls: string[], maxCharacters?: number) => {
 	}
 };
 
-export const runAgentLoop = async (ctx: SystemContext): Promise<string> => {
+export const runAgentLoop = async (ctx: SystemContext) => {
+	console.log("🔄 Starting agent loop");
+
 	// A loop that continues until we have an answer
 	// or we've taken 10 actions
 	while (!ctx.shouldStop()) {
+		console.log(`🔄 Loop iteration, step: ${ctx.getStep()}`);
+
 		// We choose the next action based on the state of our system
 		const nextAction = await getNextAction(ctx);
+		console.log(`🎯 Next action chosen:`, nextAction);
 
 		// We execute the action and update the state of our system
 		if (nextAction.type === "search") {
@@ -95,7 +99,9 @@ export const runAgentLoop = async (ctx: SystemContext): Promise<string> => {
 				throw new Error("Search action requires a query");
 			}
 
+			console.log(`🔍 Executing search for: ${nextAction.query}`);
 			const result = await searchWeb(nextAction.query);
+			console.log(`✅ Search completed, found ${result.length} results`);
 
 			// Convert to the format expected by SystemContext
 			ctx.reportQueries([
@@ -114,7 +120,11 @@ export const runAgentLoop = async (ctx: SystemContext): Promise<string> => {
 				throw new Error("Scrape action requires URLs");
 			}
 
+			console.log(`🕷️ Executing scrape for URLs:`, nextAction.urls);
 			const result = await scrapeUrl(nextAction.urls);
+			console.log(`✅ Scrape completed`);
+
+
 
 			// Convert to the format expected by SystemContext
 			if (result.success) {
@@ -123,6 +133,7 @@ export const runAgentLoop = async (ctx: SystemContext): Promise<string> => {
 						url: r.url,
 						result: r.result.success
 							? r.result.data
+							// @ts-expect-error typescript
 							: `Error: ${(r.result as unknown).error}`,
 					})),
 				);
@@ -133,12 +144,14 @@ export const runAgentLoop = async (ctx: SystemContext): Promise<string> => {
 						url: r.url,
 						result: r.result.success
 							? r.result.data
+							// @ts-expect-error typescript
 							: `Error: ${(r.result as unknown).error}`,
 					})),
 				);
 			}
 		} else if (nextAction.type === "answer") {
-			return answerQuestion(ctx);
+			console.log("✅ Agent decided to answer, breaking out of loop");
+			break;
 		}
 
 		// We increment the step counter
@@ -146,6 +159,6 @@ export const runAgentLoop = async (ctx: SystemContext): Promise<string> => {
 	}
 
 	// If we've taken 10 actions and still don't have an answer,
-	// we ask the LLM to give its best attempt at an answer
-	return answerQuestion(ctx, { isFinal: true });
+	// the context is still built up and ready for final answering
+	console.log("⚠️ Reached step limit, context ready for final answer");
 };
