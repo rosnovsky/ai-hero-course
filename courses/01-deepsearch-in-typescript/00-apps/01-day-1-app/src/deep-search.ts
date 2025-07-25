@@ -1,17 +1,19 @@
 import {
-	generateObject,
-	type Message,
-	streamText,
-	type TelemetrySettings,
+  generateObject,
+  type Message,
+  streamText,
+  type TelemetrySettings,
 } from "ai";
-import type { Action } from "~/action-types";
 import { actionSchema } from "~/action-types";
 import type { OurMessageAnnotation } from "~/message-annotation";
 import { model } from "~/models";
 import { runAgentLoop } from "~/run-agent-loop";
 import { SystemContext } from "~/system-context";
 
-export const getNextAction = async (context: SystemContext) => {
+export const getNextAction = async (
+	context: SystemContext,
+	langfuseTraceId?: string,
+) => {
 	console.log("🤔 Getting next action. Current context:", {
 		step: context.getStep(),
 		shouldStop: context.shouldStop(),
@@ -45,8 +47,14 @@ Workflow Strategy:
 3. Search again if you need additional sources or different angles
 4. Answer when you have comprehensive information
 
-${context.getFullContext()}
-		`,
+${context.getFullContext()}`,
+		experimental_telemetry: {
+			isEnabled: !!langfuseTraceId,
+			functionId: "get-next-action",
+			metadata: {
+				langfuseTraceId,
+			},
+		},
 	});
 
 	console.log("🎯 Action decision made:", result.object);
@@ -74,11 +82,17 @@ export const streamFromDeepSearch = async (opts: {
 	const context = new SystemContext(question);
 	console.log("📋 Created system context");
 
+	const langfuseTraceId =
+		opts.telemetry.isEnabled && opts.telemetry.metadata
+			? (opts.telemetry.metadata as { langfuseTraceId?: string }).langfuseTraceId
+			: undefined;
+
 	// Run the agent loop to build the context
 	console.log("🔄 About to call runAgentLoop");
 	await runAgentLoop({
 		context,
 		writeMessageAnnotation: opts.writeMessageAnnotation,
+		langfuseTraceId,
 	});
 	console.log("✅ runAgentLoop completed, now streaming final answer");
 
@@ -109,7 +123,10 @@ Remember: Your goal is to provide a helpful, accurate, and well-sourced answer t
 		system: systemPrompt,
 		prompt: context.getFullContext(),
 		onFinish: opts.onFinish,
-		experimental_telemetry: opts.telemetry,
+		experimental_telemetry: {
+			...opts.telemetry,
+			functionId: "stream-from-deep-search",
+		},
 	});
 };
 
@@ -132,12 +149,7 @@ export async function askDeepSearch(messages: Message[]): Promise<string> {
 
 		console.log("📊 Agent loop completed, consuming stream...");
 
-		// Collect text during stream consumption
-		let collectedText = "";
-
-		for await (const textPart of result.textStream) {
-			collectedText += textPart;
-		}
+		const collectedText = await result.text;
 
 		console.log("✅ Stream consumed successfully");
 		console.log("📝 Final text result length:", collectedText.length);

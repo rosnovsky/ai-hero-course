@@ -86,6 +86,7 @@ const scrapeUrl = async (urls: string[], maxCharacters?: number) => {
 export const runAgentLoop = async (opts: {
 	context: SystemContext;
 	writeMessageAnnotation: (annotation: OurMessageAnnotation) => void;
+	langfuseTraceId?: string;
 }) => {
 	console.log("🔄 Starting agent loop");
 
@@ -95,7 +96,7 @@ export const runAgentLoop = async (opts: {
 		console.log(`🔄 Loop iteration, step: ${opts.context.getStep()}`);
 
 		// We choose the next action based on the state of our system
-		const nextAction = await getNextAction(opts.context);
+		const nextAction = await getNextAction(opts.context, opts.langfuseTraceId);
 		console.log(`🎯 Next action chosen:`, nextAction);
 
 		opts.writeMessageAnnotation({

@@ -1,4 +1,4 @@
-import type { Message } from "ai";
+import type { JSONValue, Message } from "ai";
 import { appendResponseMessages, createDataStreamResponse } from "ai";
 import { Langfuse } from "langfuse";
 import { streamFromDeepSearch } from "~/deep-search";
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
 			const result = await streamFromDeepSearch({
 				messages,
 				writeMessageAnnotation: (annotation) => {
-					dataStream.writeMessageAnnotation(annotation);
+					dataStream.writeMessageAnnotation(annotation as unknown as JSONValue);
 				},
 				onFinish: async ({ response }) => {
 					try {

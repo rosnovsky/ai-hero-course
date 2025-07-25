@@ -53,7 +53,7 @@ export const ChatPage = ({ userName, chatId, initialMessages }: ChatProps) => {
 									role={message.role}
 									userName={userName}
 									annotations={
-										(message.annotations as OurMessageAnnotation[]) ?? []
+										(message.annotations as unknown as OurMessageAnnotation[]) ?? []
 									}
 								/>
 							);
