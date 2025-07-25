@@ -39,6 +39,13 @@ If you receive new information which changes your plan, you should update your p
 
 Use scrapePages for: full articles, detailed explanations, code examples, complete documentation, or any time you need more than just snippets.
 
+The scrapePages tool accepts an optional 'maxCharacters' parameter to limit content length:
+- Use maxCharacters when you need to control token usage or stay within context limits
+- For summaries: 1000-2000 characters usually provide good context
+- For detailed analysis: 3000-5000 characters capture comprehensive information
+- For quick facts: 500-800 characters are often sufficient
+- When processing multiple URLs, consider using smaller limits (800-1500 chars) to avoid overwhelming the context
+
 # Markdown Link Formatting Instructions
 
 You must format all links as inline markdown links using the exact syntax: '[link text](URL)'.
@@ -116,12 +123,13 @@ Follow this format consistently throughout your response.`,
 			scrapePages: {
 				parameters: z.object({
 					urls: z.array(z.string()).describe("URLs to scrape"),
+					maxCharacters: z.number().optional().describe("Maximum number of characters to return from each scraped page"),
 				}),
-				execute: async ({ urls }: { urls: string[] }) => {
+				execute: async ({ urls, maxCharacters }: { urls: string[]; maxCharacters?: number }) => {
 					console.log("🕷️ scrapePages tool called with URLs:", urls);
 
 					try {
-						const result = await cachedBulkCrawlWebsites({ urls });
+						const result = await cachedBulkCrawlWebsites({ urls, maxCharacters });
 						console.log("✅ scrapePages completed successfully for", urls.length, "URLs");
 						console.log("🕷️ scrapePages result:", result);
 						return result;

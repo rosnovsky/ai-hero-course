@@ -43,6 +43,7 @@ export type BulkCrawlResponse =
 
 export interface CrawlOptions {
 	maxRetries?: number;
+	maxCharacters?: number;
 }
 
 export interface BulkCrawlOptions extends CrawlOptions {
@@ -56,7 +57,7 @@ const turndownService = new TurndownService({
 	emDelimiter: "*",
 });
 
-const extractArticleText = (html: string): string => {
+const extractArticleText = (html: string, maxCharacters?: number): string => {
 	const $ = cheerio.load(html);
 	$("script, style, nav, header, footer, iframe, noscript").remove();
 
@@ -91,7 +92,13 @@ const extractArticleText = (html: string): string => {
 		}
 	}
 
-	return content.trim();
+	const trimmedContent = content.trim();
+
+	if (typeof maxCharacters === 'number' && trimmedContent.length > maxCharacters) {
+		return trimmedContent.substring(0, maxCharacters) + "...";
+	}
+
+	return trimmedContent;
 };
 
 const checkRobotsTxt = async (url: string): Promise<boolean> => {
@@ -119,12 +126,12 @@ const checkRobotsTxt = async (url: string): Promise<boolean> => {
 export const bulkCrawlWebsites = async (
 	options: BulkCrawlOptions,
 ): Promise<BulkCrawlResponse> => {
-	const { urls, maxRetries = DEFAULT_MAX_RETRIES } = options;
+	const { urls, maxRetries = DEFAULT_MAX_RETRIES, maxCharacters } = options;
 
 	const results = await Promise.all(
 		urls.map(async (url) => ({
 			url,
-			result: await crawlWebsite({ url, maxRetries }),
+			result: await crawlWebsite({ url, maxRetries, maxCharacters }),
 		})),
 	);
 
@@ -152,7 +159,7 @@ export const bulkCrawlWebsites = async (
 export const crawlWebsite = cacheWithRedis(
 	"crawlWebsite",
 	async (options: CrawlOptions & { url: string }): Promise<CrawlResponse> => {
-		const { url, maxRetries = DEFAULT_MAX_RETRIES } = options;
+		const { url, maxRetries = DEFAULT_MAX_RETRIES, maxCharacters } = options;
 
 		// Check robots.txt before attempting to crawl
 		const isAllowed = await checkRobotsTxt(url);
@@ -172,7 +179,7 @@ export const crawlWebsite = cacheWithRedis(
 
 				if (response.ok) {
 					const html = await response.text();
-					const articleText = extractArticleText(html);
+					const articleText = extractArticleText(html, maxCharacters);
 					return {
 						success: true,
 						data: articleText,
