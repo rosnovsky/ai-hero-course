@@ -31,6 +31,11 @@ export class SystemContext {
   private step = 0;
 
   /**
+   * The user's original question
+   */
+  private userQuestion = "";
+
+  /**
    * The history of all queries searched
    */
   private queryHistory: QueryResult[] = [];
@@ -40,8 +45,28 @@ export class SystemContext {
    */
   private scrapeHistory: ScrapeResult[] = [];
 
+  constructor(userQuestion = "") {
+    this.userQuestion = userQuestion;
+  }
+
   shouldStop() {
     return this.step >= 10;
+  }
+
+  incrementStep() {
+    this.step++;
+  }
+
+  getStep() {
+    return this.step;
+  }
+
+  setUserQuestion(question: string) {
+    this.userQuestion = question;
+  }
+
+  getUserQuestion(): string {
+    return this.userQuestion;
   }
 
   reportQueries(queries: QueryResult[]) {
@@ -53,6 +78,9 @@ export class SystemContext {
   }
 
   getQueryHistory(): string {
+    if (this.queryHistory.length === 0) {
+      return "";
+    }
     return this.queryHistory
       .map((query) =>
         [
@@ -64,6 +92,9 @@ export class SystemContext {
   }
 
   getScrapeHistory(): string {
+    if (this.scrapeHistory.length === 0) {
+      return "";
+    }
     return this.scrapeHistory
       .map((scrape) =>
         [
@@ -74,5 +105,27 @@ export class SystemContext {
         ].join("\n\n"),
       )
       .join("\n\n");
+  }
+
+  getFullContext(): string {
+    const parts = [];
+
+    if (this.userQuestion) {
+      parts.push(`## User Question\n${this.userQuestion}`);
+    }
+
+    if (this.queryHistory.length > 0) {
+      const queryHistory = this.getQueryHistory();
+      parts.push(`## Search History\n${queryHistory}`);
+    }
+
+    if (this.scrapeHistory.length > 0) {
+      const scrapeHistory = this.getScrapeHistory();
+      parts.push(`## Scrape History\n${scrapeHistory}`);
+    }
+
+    parts.push(`## Current Step\n${this.step + 1}/10`);
+
+    return parts.join("\n\n");
   }
 }

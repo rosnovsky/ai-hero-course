@@ -1,16 +1,58 @@
-import { type Message, streamText, type TelemetrySettings } from "ai";
+import {
+    generateObject,
+    type Message,
+    streamText,
+    type TelemetrySettings,
+} from "ai";
 import { z } from "zod";
+import { actionSchema } from "~/action-types";
 import { env } from "~/env";
 import { model } from "~/models";
 import { searchSerper } from "~/serper";
 import { cacheWithRedis } from "~/server/redis/redis";
 import { bulkCrawlWebsites } from "~/server/web-scraper";
+import type { SystemContext } from "~/system-context";
 
 // Cache the bulk crawl function
 const cachedBulkCrawlWebsites = cacheWithRedis(
 	"scrapePages",
 	bulkCrawlWebsites,
 );
+
+export const getNextAction = async (context: SystemContext) => {
+	const result = await generateObject({
+		model,
+		schema: actionSchema,
+		prompt: `
+You are a helpful assistant that determines the next action to take in a web search and analysis workflow.
+
+Current date and time: ${new Date().toISOString()}
+
+Your goal is to determine the next action to take based on the context provided. You have three options:
+
+1. 'search': Search the web for more information when you need to find relevant web pages and get snippets
+2. 'scrape': Scrape specific URLs when you need to get the full content from web pages you've already found
+3. 'answer': Answer the user's question when you have sufficient information to provide a comprehensive response
+
+Decision Guidelines:
+- Start with 'search' if you haven't found relevant sources yet or need more current information
+- Use 'scrape' when you have promising URLs from search results but need their full content for detailed analysis
+- Choose 'answer' when you have gathered sufficient information to provide a complete, well-informed response
+- When users ask for "up to date", "latest", "recent", or "current" information, include the current date in search queries
+- Consider the step count - if you're approaching the limit (10 steps), lean towards answering with available information
+
+Workflow Strategy:
+1. Search first to find relevant sources and get overview snippets
+2. Scrape the most promising URLs to get detailed content
+3. Search again if you need additional sources or different angles
+4. Answer when you have comprehensive information
+
+${context.getFullContext()}
+		`,
+	});
+
+	return result.object;
+};
 
 export const streamFromDeepSearch = (opts: {
 	messages: Message[];
@@ -96,7 +138,11 @@ Follow this format consistently throughout your response.`,
 							abortSignal,
 						);
 
-						console.log("✅ searchWeb completed successfully, found:", results.organic.length, "results");
+						console.log(
+							"✅ searchWeb completed successfully, found:",
+							results.organic.length,
+							"results",
+						);
 
 						return results.organic.map((result) => ({
 							title: result.title,
@@ -112,7 +158,7 @@ Follow this format consistently throughout your response.`,
 							console.error("Error details:", {
 								name: error.name,
 								message: error.message,
-								stack: error.stack
+								stack: error.stack,
 							});
 						}
 
@@ -123,14 +169,32 @@ Follow this format consistently throughout your response.`,
 			scrapePages: {
 				parameters: z.object({
 					urls: z.array(z.string()).describe("URLs to scrape"),
-					maxCharacters: z.number().optional().describe("Maximum number of characters to return from each scraped page"),
+					maxCharacters: z
+						.number()
+						.optional()
+						.describe(
+							"Maximum number of characters to return from each scraped page",
+						),
 				}),
-				execute: async ({ urls, maxCharacters }: { urls: string[]; maxCharacters?: number }) => {
+				execute: async ({
+					urls,
+					maxCharacters,
+				}: {
+					urls: string[];
+					maxCharacters?: number;
+				}) => {
 					console.log("🕷️ scrapePages tool called with URLs:", urls);
 
 					try {
-						const result = await cachedBulkCrawlWebsites({ urls, maxCharacters });
-						console.log("✅ scrapePages completed successfully for", urls.length, "URLs");
+						const result = await cachedBulkCrawlWebsites({
+							urls,
+							maxCharacters,
+						});
+						console.log(
+							"✅ scrapePages completed successfully for",
+							urls.length,
+							"URLs",
+						);
 						console.log("🕷️ scrapePages result:", result);
 						return result;
 					} catch (error) {
@@ -141,7 +205,7 @@ Follow this format consistently throughout your response.`,
 							console.error("Error details:", {
 								name: error.name,
 								message: error.message,
-								stack: error.stack
+								stack: error.stack,
 							});
 						}
 
@@ -191,7 +255,10 @@ export async function askDeepSearch(messages: Message[]) {
 		}
 
 		// Log additional context
-		console.error("Messages that caused error:", JSON.stringify(messages, null, 2));
+		console.error(
+			"Messages that caused error:",
+			JSON.stringify(messages, null, 2),
+		);
 
 		throw error;
 	}
