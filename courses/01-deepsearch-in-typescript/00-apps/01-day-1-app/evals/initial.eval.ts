@@ -1,50 +1,91 @@
 import type { Message } from "ai";
 import { evalite } from "evalite";
+import { Langfuse } from "langfuse";
+
 import { askDeepSearch } from "~/deep-search";
+import { env } from "~/env";
+
+import { ciData } from "./ci";
+import { devData } from "./dev";
+import { regressionData } from "./regression";
 import { Factuality } from "./scorers/factuality";
 
+// Rate limiting configuration
+const EVAL_DELAY_MS = parseInt(process.env.EVAL_DELAY_MS ?? "1000", 10);
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+
+const langfuse = new Langfuse({
+	secretKey: env.LANGFUSE_SECRET_KEY,
+	publicKey: env.LANGFUSE_PUBLIC_KEY,
+	baseUrl: env.LANGFUSE_BASEURL,
+});
 
 evalite("Deep Search Eval", {
-	data: async (): Promise<{ input: Message[]; expected: string }[]> => {
-		return [
-			{
-				input: [
-					{
-						id: "1",
-						role: "user",
-						content: "What is the latest version of TypeScript?",
-					},
-				],
-				expected: "The current TypeScript version is 5.8",
-			},
-			{
-				input: [
-					{
-						id: "2",
-						role: "user",
-						content: "What are the main features of Next.js 15?",
-					},
-				],
-				expected: `@next/codemod CLI: Easily upgrade to the latest Next.js and React versions.
-Async Request APIs (Breaking): Incremental step towards a simplified rendering and caching model.
-Caching Semantics (Breaking): fetch requests, GET Route Handlers, and client navigations are no longer cached by default.
-React 19 Support: Support for React 19, React Compiler (Experimental), and hydration error improvements.
-Turbopack Dev (Stable): Performance and stability improvements.
-Static Indicator: New visual indicator shows static routes during development.
-unstable_after API (Experimental): Execute code after a response finishes streaming.
-instrumentation.js API (Stable): New API for server lifecycle observability.
-Enhanced Forms (next/form): Enhance HTML forms with client-side navigation.
-next.config: TypeScript support for next.config.ts.
-Self-hosting Improvements: More control over Cache-Control headers.
-Server Actions Security: Unguessable endpoints and removal of unused actions.
-Bundling External Packages (Stable): New config options for App and Pages Router.
-ESLint 9 Support: Added support for ESLint 9.
-Development and Build Performance: Improved build times and Faster Fast Refresh.`,
-			},
-		];
+	data: (): { input: Message[]; expected: string }[] => {
+		console.log("Loading dataset:", env.EVAL_DATASET);
+
+		const data = [...devData];
+
+		// If CI, add the CI data
+		if (env.EVAL_DATASET === "ci") {
+			data.push(...ciData);
+			// If Regression, add the regression data AND the CI data
+		} else if (env.EVAL_DATASET === "regression") {
+			data.push(...ciData, ...regressionData);
+		}
+
+		return data;
 	},
 	task: async (input) => {
-		return askDeepSearch(input);
+		console.log("Starting task with input:", input);
+
+		const trace = langfuse.trace({
+			name: "deep-search-eval",
+			"environment": "test",
+			metadata: {
+				dataset: env.EVAL_DATASET,
+				inputLength: input.length,
+				question: input[0]?.content ?? "unknown"
+			},
+		});
+
+		try {
+			// Simple rate limiting with configurable delay
+			console.log(`⏳ Rate limiting: waiting ${EVAL_DELAY_MS}ms before request...`);
+			await sleep(EVAL_DELAY_MS);
+
+			console.log("Calling askDeepSearch...");
+
+			const span = trace.span({
+				name: "askDeepSearch",
+				input: input
+			});
+
+			const result = await askDeepSearch(input);
+
+			console.log("askDeepSearch completed with result:", result);
+
+			span.end({ output: result });
+			trace.update({
+				output: result
+			});
+
+			return result;
+		} catch (error) {
+			console.error("Error in askDeepSearch:", error);
+
+			const errorMessage = error instanceof Error ? error.message : "Unknown error";
+			trace.update({
+				"output": errorMessage,
+			});
+
+			throw error;
+		} finally {
+			// Ensure langfuse traces are flushed
+			await langfuse.flushAsync();
+		}
 	},
 	scorers: [
 		{

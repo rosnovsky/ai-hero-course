@@ -1,10 +1,8 @@
-import { google } from "@ai-sdk/google";
 import type { Message } from "ai";
 import { generateObject } from "ai";
 import { createScorer } from "evalite";
 import { z } from "zod";
-
-export const factualityModel = google("gemini-1.5-flash");
+import { factualityModel } from "../../src/models";
 
 export const checkFactuality = async (opts: {
 	question: string;
@@ -73,7 +71,7 @@ export const Factuality = createScorer<Message[], string, string>({
 	name: "Factuality",
 	scorer: async ({ input, expected, output }) => {
 		// Extract the question from the last user message
-		const question = input[input.length - 1]?.content || "";
+		const question = input[input.length - 1]?.content ?? "";
 
 		return checkFactuality({
 			question,

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { cacheWithRedis } from "~/server/redis/redis";
 
 export declare namespace SerperTool {

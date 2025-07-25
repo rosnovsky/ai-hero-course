@@ -25,8 +25,6 @@ export const streamFromDeepSearch = (opts: {
 1. 'searchWeb' - Use this first to find relevant web pages and get snippets
 2. 'scrapePages' - Use this to get the full content from web pages
 
-IMPORTANT: You MUST use scrapePages after searchWeb to get complete information. Search snippets are often incomplete.
-
 Current date and time: ${new Date().toISOString()}
 
 When users ask for "up to date", "latest", "recent", or "current" information, make sure to include the current date in your search queries to find the most recent information available.
@@ -82,17 +80,36 @@ Follow this format consistently throughout your response.`,
 					query: z.string().describe("The query to search the web for"),
 				}),
 				execute: async ({ query }: { query: string }, { abortSignal }) => {
-					const results = await searchSerper(
-						{ q: query, num: 10 },
-						abortSignal,
-					);
+					console.log("🔍 searchWeb tool called with query:", query);
 
-					return results.organic.map((result) => ({
-						title: result.title,
-						link: result.link,
-						snippet: result.snippet,
-						date: result.date,
-					}));
+					try {
+						const results = await searchSerper(
+							{ q: query, num: 10 },
+							abortSignal,
+						);
+
+						console.log("✅ searchWeb completed successfully, found:", results.organic.length, "results");
+
+						return results.organic.map((result) => ({
+							title: result.title,
+							link: result.link,
+							snippet: result.snippet,
+							date: result.date,
+						}));
+					} catch (error) {
+						console.error("❌ Error in searchWeb tool:", error);
+						console.error("Query that caused error:", query);
+
+						if (error instanceof Error) {
+							console.error("Error details:", {
+								name: error.name,
+								message: error.message,
+								stack: error.stack
+							});
+						}
+
+						throw error;
+					}
 				},
 			},
 			scrapePages: {
@@ -101,9 +118,26 @@ Follow this format consistently throughout your response.`,
 				}),
 				execute: async ({ urls }: { urls: string[] }) => {
 					console.log("🕷️ scrapePages tool called with URLs:", urls);
-					const result = await cachedBulkCrawlWebsites({ urls });
-					console.log("🕷️ scrapePages result:", result);
-					return result;
+
+					try {
+						const result = await cachedBulkCrawlWebsites({ urls });
+						console.log("✅ scrapePages completed successfully for", urls.length, "URLs");
+						console.log("🕷️ scrapePages result:", result);
+						return result;
+					} catch (error) {
+						console.error("❌ Error in scrapePages tool:", error);
+						console.error("URLs that caused error:", urls);
+
+						if (error instanceof Error) {
+							console.error("Error details:", {
+								name: error.name,
+								message: error.message,
+								stack: error.stack
+							});
+						}
+
+						throw error;
+					}
 				},
 			},
 		},
@@ -112,19 +146,44 @@ Follow this format consistently throughout your response.`,
 	});
 
 export async function askDeepSearch(messages: Message[]) {
-	const result = streamFromDeepSearch({
-		messages,
-		onFinish: () => {
-			// Intentionally empty - no persistence needed for evaluation
-		},
-		telemetry: {
-			isEnabled: false,
-		},
-	});
+	console.log("🔍 askDeepSearch called with messages:", messages.length);
 
-	// Consume the stream - without this,
-	// the stream will never finish
-	await result.consumeStream();
+	try {
+		const result = streamFromDeepSearch({
+			messages,
+			onFinish: () => {
+				// Intentionally empty - no persistence needed for evaluation
+			},
+			telemetry: {
+				isEnabled: false,
+			},
+		});
 
-	return await result.text;
+		console.log("📊 Stream created, consuming...");
+
+		// Collect text during stream consumption
+		let collectedText = "";
+
+		for await (const textPart of result.textStream) {
+			collectedText += textPart;
+		}
+
+		console.log("✅ Stream consumed successfully");
+		console.log("📝 Final text result length:", collectedText.length);
+
+		return collectedText;
+	} catch (error) {
+		console.error("❌ Error in askDeepSearch:", error);
+
+		if (error instanceof Error) {
+			console.error("Error name:", error.name);
+			console.error("Error message:", error.message);
+			console.error("Error stack:", error.stack);
+		}
+
+		// Log additional context
+		console.error("Messages that caused error:", JSON.stringify(messages, null, 2));
+
+		throw error;
+	}
 }
