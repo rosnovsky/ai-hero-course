@@ -19,8 +19,12 @@ export const getNextAction = async (
 	console.log("🤔 Getting next action. Current context:", {
 		step: context.getStep(),
 		shouldStop: context.shouldStop(),
-		question: context.getUserQuestion(),
+		conversationHistory: context.getConversationHistory(),
 	});
+
+	const conversationHistory = context.getConversationHistory();
+	const queryHistory = context.getQueryHistory();
+	const scrapeHistory = context.getScrapeHistory();
 
 	const result = await generateObject({
 		model,
@@ -38,6 +42,8 @@ Your goal is to determine the next action to take based on the context provided.
 
 Decision Guidelines:
 - Start with 'search' if you haven't found relevant sources yet or need more current information
+- If you have already found some relevant URLs but need their full content, use 'scrape'
+- Rephrase the user's question every time you perform a search.
 - Use 'scrape' when you have promising URLs from search results but need their full content for detailed analysis
 - Choose 'answer' when you have gathered sufficient information to provide a complete, well-informed response
 - When users ask for "up to date", "latest", "recent", or "current" information, include the current date in search queries
@@ -85,7 +91,7 @@ export const streamFromDeepSearch = async (opts: {
 
 	console.log("❓ Extracted question:", question);
 	// Create system context with the question
-	const context = new SystemContext(question, opts.requestHints);
+	const context = new SystemContext(opts.messages, opts.requestHints);
 
 	console.log("📋 Created system context");
 

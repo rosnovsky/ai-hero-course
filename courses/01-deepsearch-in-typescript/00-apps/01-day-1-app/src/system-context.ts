@@ -1,3 +1,4 @@
+import type { Message } from "ai";
 import type { RequestHints } from "~/lib/request-hints";
 
 type QueryResultSearchResult = {
@@ -35,7 +36,7 @@ export class SystemContext {
   /**
    * The user's original question
    */
-  private userQuestion = "";
+  private conversationHistory: Message[] = [];
 
   /**
    * The user's location hints
@@ -52,13 +53,13 @@ export class SystemContext {
    */
   private scrapeHistory: ScrapeResult[] = [];
 
-  constructor(userQuestion = "", requestHints?: RequestHints) {
-    this.userQuestion = userQuestion;
+  constructor(conversationHistory: Message[], requestHints?: RequestHints) {
+    this.conversationHistory = conversationHistory;
     this.requestHints = requestHints;
   }
 
   shouldStop() {
-    return this.step >= 10;
+    return this.step >= 3;
   }
 
   incrementStep() {
@@ -69,12 +70,12 @@ export class SystemContext {
     return this.step;
   }
 
-  setUserQuestion(question: string) {
-    this.userQuestion = question;
+  setConversationHistory(messages: Message[]) {
+    this.conversationHistory = messages;
   }
 
-  getUserQuestion(): string {
-    return this.userQuestion;
+  getConversationHistory(): Message[] {
+    return this.conversationHistory;
   }
 
   reportQueries(queries: QueryResult[]) {
@@ -118,8 +119,8 @@ export class SystemContext {
   getFullContext(): string {
     const parts = [];
 
-    if (this.userQuestion) {
-      parts.push(`## User Question\n${this.userQuestion}`);
+    if (this.conversationHistory) {
+      parts.push(`## User Question\n${JSON.stringify(this.conversationHistory)}`);
     }
 
     if (this.requestHints && (this.requestHints.latitude || this.requestHints.longitude || this.requestHints.city || this.requestHints.country)) {
