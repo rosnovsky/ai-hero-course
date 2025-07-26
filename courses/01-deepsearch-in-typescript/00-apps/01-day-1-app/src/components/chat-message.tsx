@@ -64,7 +64,7 @@ export const ChatMessage = ({
 				<div className="prose prose-invert max-w-none">
 					{parts.map((part, index) => {
 						if (part.type === "text") {
-							return <ReactMarkdown key={index}>{part.text}</ReactMarkdown>;
+              return <ReactMarkdown components={components} key={index}>{part.text}</ReactMarkdown>;
 						} else if (part.type === "tool-invocation") {
 							const { toolName, state } = part.toolInvocation;
 							return (

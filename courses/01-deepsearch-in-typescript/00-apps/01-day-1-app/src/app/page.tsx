@@ -1,17 +1,13 @@
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { auth } from "~/server/auth/index.ts";
 import { getChats } from "~/server/db/chats.ts";
 import { AuthButton } from "../components/auth-button.tsx";
 
 export default async function HomePage() {
 	const session = await auth();
-	if (!session?.user) {
-		return redirect("/login");
-	}
 	const isAuthenticated = !!session?.user;
-	const chats = await getChats(session.user.id);
+	const chats = isAuthenticated ? await getChats(session.user.id) : [];
 
 	return (
 		<div className="flex h-screen bg-gray-950">
@@ -61,7 +57,7 @@ export default async function HomePage() {
 
 			{/* Main content area */}
 			<div className="flex flex-1 flex-col items-center justify-center bg-gray-950 text-gray-400">
-				<div className="text-center">
+				<div className="text-center max-w-2xl">
 					<h1 className="text-2xl font-semibold text-gray-200 mb-4">
 						Welcome to AI Chat
 					</h1>
@@ -70,13 +66,21 @@ export default async function HomePage() {
 							? "Select a chat from the sidebar or start a new conversation"
 							: "Sign in to start chatting with AI"}
 					</p>
-					{isAuthenticated && (
+
+					{isAuthenticated ? (
 						<Link
 							href="/chat/new"
 							className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
 						>
 							<PlusIcon className="size-4" />
 							Start New Chat
+						</Link>
+					) : (
+						<Link
+							href="/login"
+							className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+						>
+							Sign In to Get Started
 						</Link>
 					)}
 				</div>

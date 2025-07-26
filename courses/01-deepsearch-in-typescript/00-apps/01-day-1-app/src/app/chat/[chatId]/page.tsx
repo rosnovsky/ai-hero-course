@@ -41,7 +41,8 @@ export default async function ChatPageRoute({ params }: ChatPageProps) {
 		// will use the parts to construct the content
 		content: "",
 		// Include annotations if they exist
-		annotations: msg.annotations,
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+		annotations: msg.annotations as any,
 	})) ?? [];
 
 	return <ChatPage userName={userName} chatId={chatId} initialMessages={initialMessages} />;

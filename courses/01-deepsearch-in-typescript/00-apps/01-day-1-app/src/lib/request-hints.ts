@@ -40,9 +40,9 @@ export function getRequestPromptFromHints(requestHints: RequestHints): string {
   }
 
   return `About the origin of user's request:
-- lat: ${requestHints.latitude || "unknown"}
-- lon: ${requestHints.longitude || "unknown"}
-- city: ${requestHints.city || "unknown"}
-- country: ${requestHints.country || "unknown"}
+- lat: ${requestHints.latitude ?? "unknown"}
+- lon: ${requestHints.longitude ?? "unknown"}
+- city: ${requestHints.city ?? "unknown"}
+- country: ${requestHints.country ?? "unknown"}
 `;
 }
